@@ -3,9 +3,13 @@ package config
 // Config holds all configuration for a run
 type Config struct {
 	// Input paths
-	AudioPath string
-	ImagesDir string
-	OutputDir string
+	AudioPath    string
+	ImagesDir    string
+	OutputDir    string
+	DefaultImage string // Path to default.png if found
+
+	// Content
+	Title string // Video title for context
 
 	// Working directory
 	WorkDir string
@@ -20,6 +24,10 @@ type Config struct {
 	// Subtitle settings
 	FontSize       int
 	SubtitleMargin int
+
+	// Planning settings
+	DefaultImageWeight float64 // Confidence threshold below which default is used
+	TitleWeight        string  // "high", "medium", "low"
 
 	// Whisper settings
 	WhisperModel string
@@ -36,19 +44,21 @@ type Config struct {
 // DefaultConfig returns a config with default values
 func DefaultConfig() *Config {
 	return &Config{
-		WorkDir:        ".work",
-		Aspects:        []string{"1x1", "16x9", "9x16"}, // All three by default
-		MinShotSec:     2.5,
-		MaxWords:       5,
-		BlurStrength:   20,
-		FPS:            30,
-		FontSize:       24,
-		SubtitleMargin: 20,
-		WhisperModel:   "medium.en",
-		OllamaHost:     "http://localhost:11434",
-		VisionModel:    "llava",
-		SelectModel:    "gemma3:4b-it-qat",
-		Force:          false,
+		WorkDir:            ".work",
+		Aspects:            []string{"1x1", "16x9", "9x16"},
+		MinShotSec:         2.5,
+		MaxWords:           5,
+		BlurStrength:       20,
+		FPS:                30,
+		FontSize:           24,
+		SubtitleMargin:     20,
+		DefaultImageWeight: 0.5, // Use default if confidence below this
+		TitleWeight:        "high",
+		WhisperModel:       "medium.en",
+		OllamaHost:         "http://localhost:11434",
+		VisionModel:        "llava",
+		SelectModel:        "gemma3:4b-it-qat",
+		Force:              false,
 	}
 }
 
@@ -57,8 +67,8 @@ type AspectConfig struct {
 	Width        int
 	Height       int
 	FontSize     int
-	MarginV      int // Vertical margin from bottom
-	MaxLineChars int // For subtitle wrapping
+	MarginV      int
+	MaxLineChars int
 }
 
 // GetAspectConfig returns optimized settings for each aspect ratio
@@ -76,7 +86,7 @@ func GetAspectConfig(aspect string, baseFontSize int) AspectConfig {
 		return AspectConfig{
 			Width:        1920,
 			Height:       1080,
-			FontSize:     baseFontSize + 4, // Slightly larger for wider screen
+			FontSize:     baseFontSize + 4,
 			MarginV:      30,
 			MaxLineChars: 50,
 		}
@@ -84,8 +94,8 @@ func GetAspectConfig(aspect string, baseFontSize int) AspectConfig {
 		return AspectConfig{
 			Width:        1080,
 			Height:       1920,
-			FontSize:     baseFontSize - 2, // Slightly smaller for narrow screen
-			MarginV:      80,               // More margin on tall screen
+			FontSize:     baseFontSize - 2,
+			MarginV:      80,
 			MaxLineChars: 35,
 		}
 	default:
@@ -99,7 +109,7 @@ func GetAspectConfig(aspect string, baseFontSize int) AspectConfig {
 	}
 }
 
-// AspectDimensions returns width and height for an aspect ratio (legacy helper)
+// AspectDimensions returns width and height for an aspect ratio
 func AspectDimensions(aspect string) (int, int) {
 	cfg := GetAspectConfig(aspect, 24)
 	return cfg.Width, cfg.Height

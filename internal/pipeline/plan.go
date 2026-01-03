@@ -3,6 +3,8 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/cork89/clippers/internal/config"
@@ -25,11 +27,15 @@ type TextWindows struct {
 
 // SelectionResult is the LLM's response for image selection
 type SelectionResult struct {
-	ChosenImageID string  `json:"chosen_image_id"`
-	BackupImageID string  `json:"backup_image_id"`
-	Confidence    float64 `json:"confidence"`
-	Reason        string  `json:"reason"`
+	ChosenImageID  string  `json:"chosen_image_id"`
+	BackupImageID  string  `json:"backup_image_id"`
+	Confidence     float64 `json:"confidence"`
+	Reason         string  `json:"reason"`
+	MatchesTitle   bool    `json:"matches_title"`
+	MatchesSegment bool    `json:"matches_segment"`
 }
+
+const defaultImageName = "default.png"
 
 // BuildTextWindows creates fixed-duration windows with overlapping text
 func BuildTextWindows(wd *workdir.WorkDir, cfg *config.Config, transcript *types.Transcript, force bool) (*TextWindows, error) {
@@ -56,10 +62,8 @@ func BuildTextWindows(wd *workdir.WorkDir, cfg *config.Config, transcript *types
 			end = duration
 		}
 
-		// Collect text from overlapping segments
 		var texts []string
 		for _, seg := range transcript.Segments {
-			// Check if segment overlaps with window
 			if seg.End > currentTime && seg.Start < end {
 				texts = append(texts, strings.TrimSpace(seg.Text))
 			}
@@ -84,6 +88,26 @@ func BuildTextWindows(wd *workdir.WorkDir, cfg *config.Config, transcript *types
 	return result, nil
 }
 
+// DetectDefaultImage checks if default.png exists in the images directory
+func DetectDefaultImage(imagesDir string) string {
+	candidates := []string{
+		"default.png",
+		"default.jpg",
+		"default.jpeg",
+		"Default.png",
+		"Default.jpg",
+	}
+
+	for _, name := range candidates {
+		path := filepath.Join(imagesDir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	return ""
+}
+
 // PlanTimeline uses LLM to select images for each window
 func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows, catalog *ImageCatalog, force bool) (*types.Timeline, error) {
 	if !force && wd.Exists("timeline.json") {
@@ -97,58 +121,107 @@ func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows,
 
 	fmt.Println("==> Planning timeline with", cfg.SelectModel)
 
+	// Check for default image
+	defaultImagePath := DetectDefaultImage(cfg.ImagesDir)
+	hasDefault := defaultImagePath != ""
+	if hasDefault {
+		fmt.Printf("  ✓ Found default image: %s\n", filepath.Base(defaultImagePath))
+	}
+
+	// Show title if provided
+	if cfg.Title != "" {
+		fmt.Printf("  ✓ Using title context: %q\n", cfg.Title)
+	}
+
 	client := ollama.NewClient(cfg.OllamaHost)
 
-	// Build image catalog summary for the prompt
-	catalogSummary := buildCatalogSummary(catalog)
+	// Build image catalog summary (excluding default from regular selection)
+	catalogSummary := buildCatalogSummaryWithTitle(catalog, cfg.Title, hasDefault)
 
 	var entries []types.TimelineEntry
 	previousImageID := ""
 
+	// Track usage stats
+	defaultUsageCount := 0
+	titleMatchCount := 0
+
 	for i, window := range windows.Windows {
 		fmt.Printf("  [%d/%d] %.1fs-%.1fs... ", i+1, len(windows.Windows), window.Start, window.End)
 
-		selection, err := selectImageForWindow(client, cfg.SelectModel, window, catalogSummary, previousImageID)
+		selection, err := selectImageForWindow(client, cfg, window, catalogSummary, previousImageID, hasDefault)
 		if err != nil {
 			fmt.Printf("failed: %v\n", err)
-			// Fallback: use first image or cycle
 			selection = &SelectionResult{
 				ChosenImageID: catalog.Images[i%len(catalog.Images)].ID,
-				Confidence:    0.5,
-				Reason:        "fallback selection",
+				Confidence:    0.3,
+				Reason:        "fallback due to error",
 			}
-		} else {
-			fmt.Printf("✓ %s\n", selection.ChosenImageID)
 		}
 
-		// Apply post-processing rules
+		// Apply default image logic
 		chosenID := selection.ChosenImageID
+		imagePath := ""
 
-		// Avoid immediate repeats if possible
-		if chosenID == previousImageID && selection.BackupImageID != "" && selection.BackupImageID != previousImageID {
-			chosenID = selection.BackupImageID
+		// Check if we should use default image
+		useDefault := false
+		if hasDefault {
+			// Use default if:
+			// 1. Confidence is below threshold
+			// 2. LLM explicitly chose default
+			// 3. Chosen image doesn't exist
+			if selection.Confidence < cfg.DefaultImageWeight {
+				useDefault = true
+			}
+			if strings.ToLower(chosenID) == "default.png" || strings.ToLower(chosenID) == "default" {
+				useDefault = true
+			}
 		}
 
-		// Verify the chosen image exists
-		imagePath := findImagePath(catalog, chosenID)
-		if imagePath == "" {
-			// Fallback to first available
-			chosenID = catalog.Images[0].ID
-			imagePath = catalog.Images[0].Path
+		if useDefault {
+			chosenID = filepath.Base(defaultImagePath)
+			imagePath = defaultImagePath
+			defaultUsageCount++
+			fmt.Printf("→ default (conf: %.2f)\n", selection.Confidence)
+		} else {
+			// Avoid immediate repeats if possible
+			if chosenID == previousImageID && selection.BackupImageID != "" && selection.BackupImageID != previousImageID {
+				chosenID = selection.BackupImageID
+			}
+
+			// Verify the chosen image exists
+			imagePath = findImagePath(catalog, chosenID)
+			if imagePath == "" {
+				// Fallback to default if available, otherwise first image
+				if hasDefault {
+					chosenID = filepath.Base(defaultImagePath)
+					imagePath = defaultImagePath
+					defaultUsageCount++
+				} else {
+					chosenID = catalog.Images[0].ID
+					imagePath = catalog.Images[0].Path
+				}
+			}
+
+			if selection.MatchesTitle {
+				titleMatchCount++
+			}
+			fmt.Printf("✓ %s (conf: %.2f)\n", chosenID, selection.Confidence)
 		}
 
 		entries = append(entries, types.TimelineEntry{
-			Start:   window.Start,
-			End:     window.End,
-			ImageID: chosenID,
-			Image:   imagePath,
+			Start:      window.Start,
+			End:        window.End,
+			ImageID:    chosenID,
+			Image:      imagePath,
+			Confidence: selection.Confidence,
+			Reason:     selection.Reason,
 		})
 
 		previousImageID = chosenID
 	}
 
-	// Apply smoothing pass to avoid rapid back-and-forth
-	entries = smoothTimeline(entries, catalog)
+	// Apply smoothing pass
+	entries = smoothTimeline(entries, catalog, defaultImagePath)
 
 	timeline := &types.Timeline{Entries: entries}
 
@@ -156,26 +229,53 @@ func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows,
 		return nil, err
 	}
 
+	// Print stats
 	fmt.Printf("  ✓ Planned %d shots\n", len(entries))
+	if hasDefault {
+		fmt.Printf("    Default image used: %d times (%.0f%%)\n",
+			defaultUsageCount, float64(defaultUsageCount)/float64(len(entries))*100)
+	}
+	if cfg.Title != "" {
+		fmt.Printf("    Title-matched shots: %d times (%.0f%%)\n",
+			titleMatchCount, float64(titleMatchCount)/float64(len(entries))*100)
+	}
+
 	return timeline, nil
 }
 
-func buildCatalogSummary(catalog *ImageCatalog) string {
+func buildCatalogSummaryWithTitle(catalog *ImageCatalog, title string, hasDefault bool) string {
 	var sb strings.Builder
+
+	if title != "" {
+		sb.WriteString(fmt.Sprintf("VIDEO TITLE: %q\n", title))
+		sb.WriteString("Images that match the title's theme should be strongly preferred.\n\n")
+	}
+
 	sb.WriteString("Available images:\n")
 
 	for _, img := range catalog.Images {
+		// Skip default image in regular listing
+		if strings.HasPrefix(strings.ToLower(img.ID), "default.") {
+			continue
+		}
+
 		tags := strings.Join(img.Tags, ", ")
 		sb.WriteString(fmt.Sprintf("- ID: %s\n  Caption: %s\n  Tags: %s\n\n", img.ID, img.Caption, tags))
+	}
+
+	if hasDefault {
+		sb.WriteString("\nSPECIAL: default.png\n")
+		sb.WriteString("  Use this when NO other image matches the audio segment well.\n")
+		sb.WriteString("  Set confidence LOW (0.2-0.4) when using default.\n")
 	}
 
 	return sb.String()
 }
 
-func selectImageForWindow(client *ollama.Client, model string, window TextWindow, catalog, previousID string) (*SelectionResult, error) {
-	prompt := buildSelectionPrompt(window, catalog, previousID)
+func selectImageForWindow(client *ollama.Client, cfg *config.Config, window TextWindow, catalog, previousID string, hasDefault bool) (*SelectionResult, error) {
+	prompt := buildSelectionPromptWithTitle(cfg, window, catalog, previousID, hasDefault)
 
-	response, err := client.GenerateText(model, prompt, true)
+	response, err := client.GenerateText(cfg.SelectModel, prompt, true)
 	if err != nil {
 		return nil, err
 	}
@@ -183,35 +283,71 @@ func selectImageForWindow(client *ollama.Client, model string, window TextWindow
 	return parseSelectionResponse(response)
 }
 
-func buildSelectionPrompt(window TextWindow, catalog, previousID string) string {
-	previousNote := ""
-	if previousID != "" {
-		previousNote = fmt.Sprintf("\nThe previous shot used image ID: %s. Try to avoid using the same image immediately unless it's clearly the best match.", previousID)
+func buildSelectionPromptWithTitle(cfg *config.Config, window TextWindow, catalog, previousID string, hasDefault bool) string {
+	var sb strings.Builder
+
+	sb.WriteString("You are selecting images for a video. Choose the best image for this audio segment.\n\n")
+
+	// Title context (weighted heavily)
+	if cfg.Title != "" {
+		sb.WriteString(fmt.Sprintf("=== VIDEO TITLE (IMPORTANT) ===\n%q\n", cfg.Title))
+		sb.WriteString("Images matching the title's theme should be STRONGLY preferred.\n\n")
 	}
 
-	return fmt.Sprintf(`You are selecting images for a video. Choose the best image to display during this audio segment.
+	// Audio segment
+	sb.WriteString(fmt.Sprintf("=== AUDIO SEGMENT (%.1fs to %.1fs) ===\n", window.Start, window.End))
+	if window.Text != "" {
+		sb.WriteString(fmt.Sprintf("%q\n\n", window.Text))
+	} else {
+		sb.WriteString("[No speech in this segment]\n\n")
+	}
 
-Audio text for this segment (%.1fs to %.1fs):
-"%s"
+	// Image catalog
+	sb.WriteString("=== AVAILABLE IMAGES ===\n")
+	sb.WriteString(catalog)
+	sb.WriteString("\n")
 
-%s%s
+	// Previous image context
+	if previousID != "" {
+		sb.WriteString(fmt.Sprintf("Previous shot used: %s (avoid immediate repeat unless best match)\n\n", previousID))
+	}
 
-Respond with ONLY valid JSON in this exact format:
+	// Selection criteria
+	sb.WriteString("=== SELECTION CRITERIA ===\n")
+	sb.WriteString("1. TITLE MATCH (highest priority): Does the image fit the video's overall title/theme?\n")
+	sb.WriteString("2. SEGMENT MATCH: Does the image match what's being said in this segment?\n")
+	sb.WriteString("3. VARIETY: Avoid repeating the previous image unless it's clearly the best choice.\n")
+
+	if hasDefault {
+		sb.WriteString("4. DEFAULT: Use 'default.png' ONLY if no image matches well. Set confidence to 0.3 or lower.\n")
+	}
+
+	sb.WriteString("\n")
+
+	// Output format
+	sb.WriteString(`Respond with ONLY valid JSON:
 {
   "chosen_image_id": "filename.jpg",
   "backup_image_id": "other_filename.jpg",
   "confidence": 0.8,
-  "reason": "Brief explanation of why this image matches the audio"
+  "reason": "Brief explanation",
+  "matches_title": true,
+  "matches_segment": true
 }
 
-Choose the image whose caption and tags best match the themes, subjects, or mood of the audio text.
-The chosen_image_id must exactly match one of the image IDs listed above.
+Confidence guide:
+- 0.9-1.0: Perfect match for title AND segment
+- 0.7-0.8: Good match for title OR segment
+- 0.5-0.6: Weak match, but acceptable
+- 0.3-0.4: Poor match, consider default
+- 0.1-0.2: No match, use default
 
-ONLY JSON. Nothing else.`, window.Start, window.End, window.Text, catalog, previousNote)
+ONLY JSON. Nothing else.`)
+
+	return sb.String()
 }
 
 func parseSelectionResponse(response string) (*SelectionResult, error) {
-	// Clean up response
 	response = strings.TrimSpace(response)
 	response = strings.TrimPrefix(response, "```json")
 	response = strings.TrimPrefix(response, "```")
@@ -227,6 +363,14 @@ func parseSelectionResponse(response string) (*SelectionResult, error) {
 		return nil, fmt.Errorf("empty chosen_image_id")
 	}
 
+	// Clamp confidence to valid range
+	if result.Confidence < 0 {
+		result.Confidence = 0
+	}
+	if result.Confidence > 1 {
+		result.Confidence = 1
+	}
+
 	return &result, nil
 }
 
@@ -240,16 +384,23 @@ func findImagePath(catalog *ImageCatalog, imageID string) string {
 }
 
 // smoothTimeline reduces rapid back-and-forth between images
-func smoothTimeline(entries []types.TimelineEntry, catalog *ImageCatalog) []types.TimelineEntry {
+func smoothTimeline(entries []types.TimelineEntry, catalog *ImageCatalog, defaultImagePath string) []types.TimelineEntry {
 	if len(entries) < 3 {
 		return entries
 	}
 
 	// Detect A-B-A patterns and replace middle with A
+	// But don't smooth away from default if confidence was very low
 	for i := 1; i < len(entries)-1; i++ {
 		prev := entries[i-1].ImageID
 		curr := entries[i].ImageID
 		next := entries[i+1].ImageID
+
+		// Skip smoothing if current is default with very low confidence
+		// (it was chosen for a reason)
+		if defaultImagePath != "" && curr == filepath.Base(defaultImagePath) && entries[i].Confidence < 0.3 {
+			continue
+		}
 
 		// If we have A-B-A, change to A-A-A
 		if prev == next && curr != prev {

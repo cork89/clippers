@@ -13,17 +13,19 @@ import (
 
 // ImageCaption holds the caption data for a single image
 type ImageCaption struct {
-	ID      string   `json:"id"`
-	Path    string   `json:"path"`
-	Caption string   `json:"caption"`
-	Tags    []string `json:"tags"`
-	Style   int      `json:"style"`
-	Notes   string   `json:"notes,omitempty"`
+	ID        string   `json:"id"`
+	Path      string   `json:"path"`
+	Caption   string   `json:"caption"`
+	Tags      []string `json:"tags"`
+	Style     int      `json:"style"`
+	Notes     string   `json:"notes,omitempty"`
+	IsDefault bool     `json:"is_default,omitempty"`
 }
 
 // ImageCatalog holds all image captions
 type ImageCatalog struct {
-	Images []ImageCaption `json:"images"`
+	Images       []ImageCaption `json:"images"`
+	DefaultImage string         `json:"default_image,omitempty"`
 }
 
 const captionPrompt = `Analyze this image and respond with ONLY valid JSON in this exact format:
@@ -70,16 +72,25 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 		return nil, fmt.Errorf("failed to list images: %w", err)
 	}
 
+	// Detect default image
+	defaultImagePath := DetectDefaultImage(cfg.ImagesDir)
+
 	var catalog ImageCatalog
+	catalog.DefaultImage = defaultImagePath
 
 	for i, imagePath := range images {
 		imageID := filepath.Base(imagePath)
-		fmt.Printf("  [%d/%d] %s... ", i+1, len(images), imageID)
+		isDefault := strings.HasPrefix(strings.ToLower(imageID), "default.")
+
+		fmt.Printf("  [%d/%d] %s", i+1, len(images), imageID)
+		if isDefault {
+			fmt.Print(" (default)")
+		}
+		fmt.Print("... ")
 
 		caption, err := captionImage(client, cfg.VisionModel, imagePath)
 		if err != nil {
 			fmt.Printf("failed: %v\n", err)
-			// Use fallback caption
 			caption = &ImageCaption{
 				ID:      imageID,
 				Path:    imagePath,
@@ -93,6 +104,13 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 			fmt.Printf("✓\n")
 		}
 
+		caption.IsDefault = isDefault
+
+		// Add special tags for default image
+		if isDefault {
+			caption.Tags = append(caption.Tags, "default", "fallback", "generic")
+		}
+
 		catalog.Images = append(catalog.Images, *caption)
 	}
 
@@ -100,12 +118,16 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 		return nil, err
 	}
 
-	fmt.Printf("  ✓ Captioned %d images\n", len(catalog.Images))
+	fmt.Printf("  ✓ Captioned %d images", len(catalog.Images))
+	if defaultImagePath != "" {
+		fmt.Printf(" (including default)")
+	}
+	fmt.Println()
+
 	return &catalog, nil
 }
 
 func captionImage(client *ollama.Client, model, imagePath string) (*ImageCaption, error) {
-	// First attempt with JSON mode
 	response, err := client.GenerateWithImage(model, captionPrompt, imagePath, true)
 	if err != nil {
 		return nil, err
@@ -113,7 +135,6 @@ func captionImage(client *ollama.Client, model, imagePath string) (*ImageCaption
 
 	caption, err := parseCaptionResponse(response)
 	if err != nil {
-		// Retry with stricter prompt
 		response, err = client.GenerateWithImage(model, strictCaptionPrompt, imagePath, true)
 		if err != nil {
 			return nil, err
@@ -129,7 +150,6 @@ func captionImage(client *ollama.Client, model, imagePath string) (*ImageCaption
 }
 
 func parseCaptionResponse(response string) (*ImageCaption, error) {
-	// Clean up response - remove markdown code blocks if present
 	response = strings.TrimSpace(response)
 	response = strings.TrimPrefix(response, "```json")
 	response = strings.TrimPrefix(response, "```")
@@ -141,7 +161,6 @@ func parseCaptionResponse(response string) (*ImageCaption, error) {
 		return nil, fmt.Errorf("invalid JSON: %w (response: %s)", err, truncate(response, 200))
 	}
 
-	// Validate
 	if caption.Caption == "" {
 		return nil, fmt.Errorf("empty caption")
 	}
