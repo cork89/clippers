@@ -51,22 +51,22 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 		return "", fmt.Errorf("failed to copy SRT: %w", err)
 	}
 
-	// Intermediate video path (images to video, no filters)
+	// Intermediate video path (images with blur background, no subtitles)
 	intermediatePath := wd.Path(fmt.Sprintf("render/intermediate_%s.mp4", aspect))
 
 	// Output path
 	baseName := strings.TrimSuffix(filepath.Base(cfg.AudioPath), filepath.Ext(cfg.AudioPath))
 	outputPath := filepath.Join(cfg.OutputDir, fmt.Sprintf("%s_%s.mp4", baseName, aspect))
 
-	// Pass 1: Convert images to simple video with correct timing
-	fmt.Println("  Pass 1: Converting images to video...")
-	if err := renderPass1(concatPath, intermediatePath); err != nil {
+	// Pass 1: Convert images to video with blur background + centered foreground
+	fmt.Println("  Pass 1: Building video with blur backgrounds...")
+	if err := renderPass1(concatPath, intermediatePath, aspectCfg, cfg.BlurStrength); err != nil {
 		return "", fmt.Errorf("pass 1 failed: %w", err)
 	}
 
-	// Pass 2: Apply blur, overlay, and subtitles
-	fmt.Println("  Pass 2: Applying filters and subtitles...")
-	if err := renderPass2(wd, intermediatePath, aspectSrtPath, outputPath, aspectCfg, cfg.BlurStrength); err != nil {
+	// Pass 2: Add subtitles and audio
+	fmt.Println("  Pass 2: Adding subtitles and audio...")
+	if err := renderPass2(wd, intermediatePath, aspectSrtPath, outputPath, aspectCfg); err != nil {
 		return "", fmt.Errorf("pass 2 failed: %w", err)
 	}
 
@@ -81,15 +81,44 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 	return outputPath, nil
 }
 
-// renderPass1 converts the image sequence to a simple video
-// renderPass1 converts the image sequence to a simple video
-func renderPass1(concatPath, outputPath string) error {
+// renderPass1 converts the image sequence to video with blur background + centered foreground
+func renderPass1(concatPath, outputPath string, aspectCfg config.AspectConfig, blur int) error {
+	width := aspectCfg.Width
+	height := aspectCfg.Height
+
+	effectiveBlur := blur
+	if effectiveBlur > 15 {
+		effectiveBlur = 15
+	}
+
+	// Full filter: blur background + centered foreground (aspect ratio preserved)
+	filter := fmt.Sprintf(
+		"split=2[bg][fg];"+
+			// Background: scale to cover, crop to exact size, blur
+			"[bg]scale=%d:%d:force_original_aspect_ratio=increase,"+
+			"crop=%d:%d:(iw-%d)/2:(ih-%d)/2,"+
+			"boxblur=%d:%d[bgblur];"+
+			// Foreground: scale to fit (maintains aspect ratio)
+			"[fg]scale=%d:%d:force_original_aspect_ratio=decrease[fgscaled];"+
+			// Pad foreground to center it (transparent padding)
+			"[fgscaled]pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black@0[fgpad];"+
+			// Overlay centered foreground on blurred background
+			"[bgblur][fgpad]overlay=0:0:format=auto,"+
+			// Convert to constant framerate
+			"fps=24,format=yuv420p",
+		width, height,
+		width, height, width, height,
+		effectiveBlur, effectiveBlur,
+		width, height,
+		width, height,
+	)
+
 	args := []string{
 		"-y",
 		"-f", "concat",
 		"-safe", "0",
 		"-i", concatPath,
-		"-vf", "fps=24,format=yuv420p", // Force frame duplication here
+		"-filter_complex", filter,
 		"-c:v", "libx264",
 		"-preset", "ultrafast",
 		"-crf", "18",
@@ -102,16 +131,38 @@ func renderPass1(concatPath, outputPath string) error {
 	return cmd.Run()
 }
 
-// renderPass2 applies filters and combines with audio
-func renderPass2(wd *workdir.WorkDir, videoPath, srtPath, outputPath string, aspectCfg config.AspectConfig, blur int) error {
-	filter := buildFilterComplex(aspectCfg, blur, srtPath)
+// renderPass2 adds subtitles and combines with audio
+func renderPass2(wd *workdir.WorkDir, videoPath, srtPath, outputPath string, aspectCfg config.AspectConfig) error {
+	absPath, _ := filepath.Abs(srtPath)
+	escapedSRT := filepath.ToSlash(absPath)
+	escapedSRT = strings.ReplaceAll(escapedSRT, ":", "\\:")
+	escapedSRT = strings.ReplaceAll(escapedSRT, "'", "\\'")
+
+	subtitleStyle := fmt.Sprintf(
+		"FontSize=%d,"+
+			"FontName=Arial,"+
+			"PrimaryColour=&HFFFFFF,"+
+			"SecondaryColour=&H000000,"+
+			"OutlineColour=&H000000,"+
+			"BackColour=&H80000000,"+
+			"Bold=1,"+
+			"Outline=2,"+
+			"Shadow=1,"+
+			"MarginV=%d,"+
+			"Alignment=2",
+		aspectCfg.FontSize,
+		aspectCfg.MarginV,
+	)
+
+	// Just add subtitles - video already has blur background
+	filter := fmt.Sprintf("subtitles='%s':force_style='%s'", escapedSRT, subtitleStyle)
 
 	args := []string{
 		"-y",
 		"-i", videoPath,
 		"-i", wd.Path("audio.wav"),
-		"-filter_complex", filter,
-		"-map", "[outv]",
+		"-vf", filter,
+		"-map", "0:v",
 		"-map", "1:a",
 		"-c:v", "libx264",
 		"-preset", "fast",
@@ -157,66 +208,6 @@ func writeConcatFile(path string, timeline *types.Timeline) error {
 	}
 
 	return os.WriteFile(path, []byte(sb.String()), 0644)
-}
-
-func buildFilterComplex(aspectCfg config.AspectConfig, blur int, srtPath string) string {
-	width := aspectCfg.Width
-	height := aspectCfg.Height
-
-	absPath, _ := filepath.Abs(srtPath)
-	escapedSRT := filepath.ToSlash(absPath)
-	escapedSRT = strings.ReplaceAll(escapedSRT, ":", "\\:")
-	escapedSRT = strings.ReplaceAll(escapedSRT, "'", "\\'")
-
-	subtitleStyle := fmt.Sprintf(
-		"FontSize=%d,"+
-			"FontName=Arial,"+
-			"PrimaryColour=&HFFFFFF,"+
-			"SecondaryColour=&H000000,"+
-			"OutlineColour=&H000000,"+
-			"BackColour=&H80000000,"+
-			"Bold=1,"+
-			"Outline=2,"+
-			"Shadow=1,"+
-			"MarginV=%d,"+
-			"Alignment=2",
-		aspectCfg.FontSize,
-		aspectCfg.MarginV,
-	)
-
-	effectiveBlur := blur
-	if effectiveBlur > 15 {
-		effectiveBlur = 15
-	}
-
-	// Now working with a proper video input, not images
-	filter := fmt.Sprintf(
-		"[0:v]split=2[bg][fg];"+
-
-			"[bg]scale=%d:%d:force_original_aspect_ratio=increase,"+
-			"crop=%d:%d:(iw-%d)/2:(ih-%d)/2,"+
-			"boxblur=%d:%d[bgblur];"+
-
-			"[fg]scale=%d:%d:force_original_aspect_ratio=decrease[fgscaled];"+
-
-			"[fgscaled]pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black@0[fgpad];"+
-
-			"[bgblur][fgpad]overlay=0:0:format=auto[composed];"+
-
-			"[composed]subtitles='%s':force_style='%s'[outv]",
-
-		width, height,
-		width, height, width, height,
-		effectiveBlur, effectiveBlur,
-
-		width, height,
-
-		width, height,
-
-		escapedSRT, subtitleStyle,
-	)
-
-	return filter
 }
 
 func copyFile(src, dst string) error {
