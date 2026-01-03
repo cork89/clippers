@@ -45,59 +45,33 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 		return "", fmt.Errorf("failed to write concat file: %w", err)
 	}
 
-	// Generate aspect-specific SRT with appropriate line lengths
+	// Generate aspect-specific SRT
 	aspectSrtPath := wd.Path(fmt.Sprintf("render/subtitles_%s.srt", aspect))
 	if err := copyFile(srtPath, aspectSrtPath); err != nil {
 		return "", fmt.Errorf("failed to copy SRT: %w", err)
 	}
 
+	// Intermediate video path (images to video, no filters)
+	intermediatePath := wd.Path(fmt.Sprintf("render/intermediate_%s.mp4", aspect))
+
 	// Output path
 	baseName := strings.TrimSuffix(filepath.Base(cfg.AudioPath), filepath.Ext(cfg.AudioPath))
 	outputPath := filepath.Join(cfg.OutputDir, fmt.Sprintf("%s_%s.mp4", baseName, aspect))
 
-	// Build filter complex for blur background + centered foreground
-	filter := buildFilterComplex(aspectCfg, cfg.BlurStrength, aspectSrtPath, cfg.FPS)
-
-	// Build ffmpeg command
-	args := []string{
-		"-y",
-		"-threads", "0",
-		"-f", "concat",
-		"-safe", "0",
-		"-i", concatPath,
-		"-i", wd.Path("audio.wav"),
-		"-filter_complex", filter,
-		"-map", "[outv]",
-		"-map", "1:a",
-		"-c:v", "libx264",
-		"-preset", "ultrafast",
-		"-crf", "23",
-		"-c:a", "aac",
-		"-b:a", "192k",
-		"-r", fmt.Sprintf("%d", cfg.FPS),
-		"-pix_fmt", "yuv420p",
-		"-shortest",
-		outputPath,
+	// Pass 1: Convert images to simple video with correct timing
+	fmt.Println("  Pass 1: Converting images to video...")
+	if err := renderPass1(concatPath, intermediatePath); err != nil {
+		return "", fmt.Errorf("pass 1 failed: %w", err)
 	}
 
-	fmt.Println("  Running ffmpeg...")
-
-	cmd := exec.Command("ffmpeg", args...)
-
-	// Capture stderr for error reporting but don't spam stdout
-	// var stderr strings.Builder
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		// Print last part of stderr for debugging
-		// errOutput := stderr.String()
-		// lines := strings.Split(errOutput, "\n")
-		// if len(lines) > 20 {
-		// 	lines = lines[len(lines)-20:]
-		// }
-		// return "", fmt.Errorf("ffmpeg failed: %w\n%s", err, strings.Join(lines, "\n"))
-		return "", fmt.Errorf("ffmpeg failed: %w", err)
+	// Pass 2: Apply blur, overlay, and subtitles
+	fmt.Println("  Pass 2: Applying filters and subtitles...")
+	if err := renderPass2(wd, intermediatePath, aspectSrtPath, outputPath, aspectCfg, cfg.BlurStrength); err != nil {
+		return "", fmt.Errorf("pass 2 failed: %w", err)
 	}
+
+	// Clean up intermediate file
+	os.Remove(intermediatePath)
 
 	// Get file size
 	info, _ := os.Stat(outputPath)
@@ -107,21 +81,67 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 	return outputPath, nil
 }
 
+// renderPass1 converts the image sequence to a simple video
+// renderPass1 converts the image sequence to a simple video
+func renderPass1(concatPath, outputPath string) error {
+	args := []string{
+		"-y",
+		"-f", "concat",
+		"-safe", "0",
+		"-i", concatPath,
+		"-vf", "fps=24,format=yuv420p", // Force frame duplication here
+		"-c:v", "libx264",
+		"-preset", "ultrafast",
+		"-crf", "18",
+		outputPath,
+	}
+
+	cmd := exec.Command("ffmpeg", args...)
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+// renderPass2 applies filters and combines with audio
+func renderPass2(wd *workdir.WorkDir, videoPath, srtPath, outputPath string, aspectCfg config.AspectConfig, blur int) error {
+	filter := buildFilterComplex(aspectCfg, blur, srtPath)
+
+	args := []string{
+		"-y",
+		"-i", videoPath,
+		"-i", wd.Path("audio.wav"),
+		"-filter_complex", filter,
+		"-map", "[outv]",
+		"-map", "1:a",
+		"-c:v", "libx264",
+		"-preset", "fast",
+		"-crf", "23",
+		"-threads", "0",
+		"-c:a", "aac",
+		"-b:a", "192k",
+		"-shortest",
+		"-stats",
+		outputPath,
+	}
+
+	cmd := exec.Command("ffmpeg", args...)
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
 func writeConcatFile(path string, timeline *types.Timeline) error {
 	var sb strings.Builder
 
 	for _, entry := range timeline.Entries {
 		duration := entry.End - entry.Start
 
-		// Use absolute path and forward slashes for ffmpeg compatibility
 		absPath, err := filepath.Abs(entry.Image)
 		if err != nil {
 			absPath = entry.Image
 		}
-		// Convert to forward slashes for ffmpeg
 		absPath = filepath.ToSlash(absPath)
 
-		// Escape single quotes in paths for ffmpeg concat
 		escapedPath := strings.ReplaceAll(absPath, "'", "'\\''")
 		sb.WriteString(fmt.Sprintf("file '%s'\n", escapedPath))
 		sb.WriteString(fmt.Sprintf("duration %.3f\n", duration))
@@ -139,11 +159,10 @@ func writeConcatFile(path string, timeline *types.Timeline) error {
 	return os.WriteFile(path, []byte(sb.String()), 0644)
 }
 
-func buildFilterComplex(aspectCfg config.AspectConfig, blur int, srtPath string, fps int) string {
+func buildFilterComplex(aspectCfg config.AspectConfig, blur int, srtPath string) string {
 	width := aspectCfg.Width
 	height := aspectCfg.Height
 
-	// Escape the SRT path for ffmpeg filter (Windows-compatible)
 	absPath, _ := filepath.Abs(srtPath)
 	escapedSRT := filepath.ToSlash(absPath)
 	escapedSRT = strings.ReplaceAll(escapedSRT, ":", "\\:")
@@ -165,50 +184,35 @@ func buildFilterComplex(aspectCfg config.AspectConfig, blur int, srtPath string,
 		aspectCfg.MarginV,
 	)
 
-	// Filter chain:
-	// 1. Set framerate FIRST to normalize image timing
-	// 2. Split input into two streams
-	// 3. Background: scale to cover, crop to exact size, blur
-	// 4. Foreground: scale to fit (contain), pad to exact size with transparency
-	// 5. Overlay foreground centered on background
-	// 6. Burn subtitles
+	effectiveBlur := blur
+	if effectiveBlur > 15 {
+		effectiveBlur = 15
+	}
 
+	// Now working with a proper video input, not images
 	filter := fmt.Sprintf(
-		// Set framerate first to fix image timing issues
-		"[0:v]fps=%d,split=2[bg][fg];"+
+		"[0:v]split=2[bg][fg];"+
 
-			// Background: scale to cover, crop to exact size, blur
 			"[bg]scale=%d:%d:force_original_aspect_ratio=increase,"+
 			"crop=%d:%d:(iw-%d)/2:(ih-%d)/2,"+
 			"boxblur=%d:%d[bgblur];"+
 
-			// Foreground: scale to fit (decrease to contain)
 			"[fg]scale=%d:%d:force_original_aspect_ratio=decrease[fgscaled];"+
 
-			// Pad foreground to exact canvas size (centers automatically)
 			"[fgscaled]pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black@0[fgpad];"+
 
-			// Overlay foreground on background
 			"[bgblur][fgpad]overlay=0:0:format=auto[composed];"+
 
-			// Burn subtitles
 			"[composed]subtitles='%s':force_style='%s'[outv]",
 
-		// FPS arg
-		fps,
-
-		// Background scale & crop args
 		width, height,
 		width, height, width, height,
-		blur, blur,
+		effectiveBlur, effectiveBlur,
 
-		// Foreground scale args
 		width, height,
 
-		// Foreground pad args
 		width, height,
 
-		// Subtitle args
 		escapedSRT, subtitleStyle,
 	)
 

@@ -16,7 +16,7 @@ var cfg = config.DefaultConfig()
 var aspectsFlag string
 
 var rootCmd = &cobra.Command{
-	Use:   "ac2v",
+	Use:   "clippers",
 	Short: "Audio Clip to Video converter",
 	Long:  "Convert audio clips to videos with transcribed subtitles and AI-selected images",
 }
@@ -134,7 +134,7 @@ var previewCmd = &cobra.Command{
 		}
 
 		if !wd.Exists("timeline.json") {
-			return fmt.Errorf("no timeline found. Run 'ac2v run' first")
+			return fmt.Errorf("no timeline found. Run 'clippers run' first")
 		}
 
 		var timeline types.Timeline
@@ -212,13 +212,13 @@ var renderCmd = &cobra.Command{
 		}
 
 		if !wd.Exists("timeline.json") {
-			return fmt.Errorf("no timeline found. Run 'ac2v run' first")
+			return fmt.Errorf("no timeline found. Run 'clippers run' first")
 		}
 		if !wd.Exists("subtitles.srt") {
-			return fmt.Errorf("no subtitles found. Run 'ac2v run' first")
+			return fmt.Errorf("no subtitles found. Run 'clippers run' first")
 		}
 		if !wd.Exists("audio.wav") {
-			return fmt.Errorf("no normalized audio found. Run 'ac2v run' first")
+			return fmt.Errorf("no normalized audio found. Run 'clippers run' first")
 		}
 
 		var timeline types.Timeline
@@ -292,7 +292,7 @@ var planCmd = &cobra.Command{
 		}
 
 		fmt.Printf("\n==> Timeline planned: %d shots\n", len(timeline.Entries))
-		fmt.Println("Run 'ac2v preview' to see details or 'ac2v render' to generate videos.")
+		fmt.Println("Run 'clippers preview' to see details or 'clippers render' to generate videos.")
 
 		return nil
 	},

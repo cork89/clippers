@@ -1,4 +1,4 @@
-# AC2V – Audio Clip to Video  
+# Clippers – Audio Clip to Video  
 **Local-first, AI-driven, multi-format video generator**
 
 Turn a 10-30 s audio clip and a small folder of images into **three ready-to-post videos** (1:1, 16:9, 9:16) with zero cloud calls after the one-time model download.
@@ -70,7 +70,7 @@ output/
 
 ### Main command
 ```
-ac2v run -a <audio> -i <images> -o <output> [flags]
+clippers run -a <audio> -i <images> -o <output> [flags]
 ```
 
 | flag | default | meaning |
