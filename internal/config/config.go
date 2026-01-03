@@ -49,7 +49,7 @@ func DefaultConfig() *Config {
 		MinShotSec:         2.5,
 		MaxWords:           5,
 		BlurStrength:       20,
-		FPS:                30,
+		FPS:                24,
 		FontSize:           24,
 		SubtitleMargin:     20,
 		DefaultImageWeight: 0.5, // Use default if confidence below this

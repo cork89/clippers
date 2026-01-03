@@ -13,7 +13,7 @@ Turn a 10-30 s audio clip and a small folder of images into **three ready-to-pos
 4. **Renders** three MP4s with:
    - Hard-cut edits (≥ 2.5 s per shot)  
    - Blurred background + centred foreground  
-   - Bottom-centre chunked subtitles  
+   - Bottom-center chunked subtitles  
    - 30 fps, H.264/AAC, yuv420p
 
 All intermediate files are cached; re-runs are instant if nothing changed.
@@ -160,7 +160,7 @@ Delete `.work` or use `--force` to regenerate any stage.
 **MVP (done)**  
 ✔ local whisper, llava, llama3.1  
 ✔ 1:1 / 16:9 / 9:16 outputs  
-✔ hard cuts, blur background, centred image, bottom-centre subs  
+✔ hard cuts, blur background, centered image, bottom-center subs  
 
 **Future (not MVP)**  
 - word-level alignment (WhisperX)  

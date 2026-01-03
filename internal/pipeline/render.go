@@ -56,11 +56,12 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 	outputPath := filepath.Join(cfg.OutputDir, fmt.Sprintf("%s_%s.mp4", baseName, aspect))
 
 	// Build filter complex for blur background + centered foreground
-	filter := buildFilterComplex(aspectCfg, cfg.BlurStrength, aspectSrtPath)
+	filter := buildFilterComplex(aspectCfg, cfg.BlurStrength, aspectSrtPath, cfg.FPS)
 
 	// Build ffmpeg command
 	args := []string{
 		"-y",
+		"-threads", "0",
 		"-f", "concat",
 		"-safe", "0",
 		"-i", concatPath,
@@ -69,7 +70,7 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 		"-map", "[outv]",
 		"-map", "1:a",
 		"-c:v", "libx264",
-		"-preset", "medium",
+		"-preset", "ultrafast",
 		"-crf", "23",
 		"-c:a", "aac",
 		"-b:a", "192k",
@@ -84,17 +85,18 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 	cmd := exec.Command("ffmpeg", args...)
 
 	// Capture stderr for error reporting but don't spam stdout
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
+	// var stderr strings.Builder
+	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
 		// Print last part of stderr for debugging
-		errOutput := stderr.String()
-		lines := strings.Split(errOutput, "\n")
-		if len(lines) > 20 {
-			lines = lines[len(lines)-20:]
-		}
-		return "", fmt.Errorf("ffmpeg failed: %w\n%s", err, strings.Join(lines, "\n"))
+		// errOutput := stderr.String()
+		// lines := strings.Split(errOutput, "\n")
+		// if len(lines) > 20 {
+		// 	lines = lines[len(lines)-20:]
+		// }
+		// return "", fmt.Errorf("ffmpeg failed: %w\n%s", err, strings.Join(lines, "\n"))
+		return "", fmt.Errorf("ffmpeg failed: %w", err)
 	}
 
 	// Get file size
@@ -137,19 +139,16 @@ func writeConcatFile(path string, timeline *types.Timeline) error {
 	return os.WriteFile(path, []byte(sb.String()), 0644)
 }
 
-func buildFilterComplex(aspectCfg config.AspectConfig, blur int, srtPath string) string {
+func buildFilterComplex(aspectCfg config.AspectConfig, blur int, srtPath string, fps int) string {
 	width := aspectCfg.Width
 	height := aspectCfg.Height
 
 	// Escape the SRT path for ffmpeg filter (Windows-compatible)
-	// Convert to forward slashes and escape colons and backslashes
 	absPath, _ := filepath.Abs(srtPath)
 	escapedSRT := filepath.ToSlash(absPath)
 	escapedSRT = strings.ReplaceAll(escapedSRT, ":", "\\:")
 	escapedSRT = strings.ReplaceAll(escapedSRT, "'", "\\'")
 
-	// Build subtitle style string
-	// ASS style format for subtitles filter
 	subtitleStyle := fmt.Sprintf(
 		"FontSize=%d,"+
 			"FontName=Arial,"+
@@ -161,23 +160,24 @@ func buildFilterComplex(aspectCfg config.AspectConfig, blur int, srtPath string)
 			"Outline=2,"+
 			"Shadow=1,"+
 			"MarginV=%d,"+
-			"Alignment=2", // Bottom center
+			"Alignment=2",
 		aspectCfg.FontSize,
 		aspectCfg.MarginV,
 	)
 
 	// Filter chain:
-	// 1. Split input into two streams
-	// 2. Background: scale to cover, crop to exact size, blur
-	// 3. Foreground: scale to fit (contain), pad to exact size with transparency
-	// 4. Overlay foreground centered on background
-	// 5. Burn subtitles
+	// 1. Set framerate FIRST to normalize image timing
+	// 2. Split input into two streams
+	// 3. Background: scale to cover, crop to exact size, blur
+	// 4. Foreground: scale to fit (contain), pad to exact size with transparency
+	// 5. Overlay foreground centered on background
+	// 6. Burn subtitles
 
 	filter := fmt.Sprintf(
-		// Split input
-		"[0:v]split=2[bg][fg];"+
+		// Set framerate first to fix image timing issues
+		"[0:v]fps=%d,split=2[bg][fg];"+
 
-			// Background: scale to cover (increase to fill), crop to exact size, blur
+			// Background: scale to cover, crop to exact size, blur
 			"[bg]scale=%d:%d:force_original_aspect_ratio=increase,"+
 			"crop=%d:%d:(iw-%d)/2:(ih-%d)/2,"+
 			"boxblur=%d:%d[bgblur];"+
@@ -193,6 +193,9 @@ func buildFilterComplex(aspectCfg config.AspectConfig, blur int, srtPath string)
 
 			// Burn subtitles
 			"[composed]subtitles='%s':force_style='%s'[outv]",
+
+		// FPS arg
+		fps,
 
 		// Background scale & crop args
 		width, height,
