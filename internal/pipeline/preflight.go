@@ -8,10 +8,11 @@ import (
 
 	"github.com/cork89/clippers/internal/config"
 	"github.com/cork89/clippers/internal/ollama"
+	"github.com/cork89/clippers/internal/workdir"
 )
 
 // Preflight verifies all dependencies are available
-func Preflight(cfg *config.Config) error {
+func Preflight(cfg *config.Config, wd *workdir.WorkDir) error {
 	fmt.Println("==> Preflight checks")
 
 	// Check ffmpeg
@@ -41,30 +42,10 @@ func Preflight(cfg *config.Config) error {
 	fmt.Printf("  ✓ SubtitleEdit found: %s\n", subtitleEditBin)
 
 	// Check Ollama
-	client := ollama.NewClient(cfg.OllamaHost)
-	if err := client.Ping(); err != nil {
+	if err := preflightOllama(cfg, wd); err != nil {
 		return fmt.Errorf("ollama not reachable: %w\n  Make sure Ollama is running: ollama serve", err)
 	}
 	fmt.Printf("  ✓ ollama reachable at %s\n", cfg.OllamaHost)
-
-	// Check required models
-	hasVision, err := client.HasModel(cfg.VisionModel)
-	if err != nil {
-		return fmt.Errorf("failed to check for vision model: %w", err)
-	}
-	if !hasVision {
-		return fmt.Errorf("vision model not found: %s\n  Run: ollama pull %s", cfg.VisionModel, cfg.VisionModel)
-	}
-	fmt.Printf("  ✓ vision model: %s\n", cfg.VisionModel)
-
-	hasSelect, err := client.HasModel(cfg.SelectModel)
-	if err != nil {
-		return fmt.Errorf("failed to check for select model: %w", err)
-	}
-	if !hasSelect {
-		return fmt.Errorf("select model not found: %s\n  Run: ollama pull %s", cfg.SelectModel, cfg.SelectModel)
-	}
-	fmt.Printf("  ✓ select model: %s\n", cfg.SelectModel)
 
 	// Check audio file exists
 	if _, err := os.Stat(cfg.AudioPath); err != nil {
@@ -87,6 +68,28 @@ func Preflight(cfg *config.Config) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 	fmt.Printf("  ✓ output directory: %s\n", cfg.OutputDir)
+
+	return nil
+}
+
+func preflightOllama(cfg *config.Config, wd *workdir.WorkDir) error {
+	if !needsOllama(cfg, wd) {
+		return nil
+	}
+
+	client := ollama.NewClient(cfg.OllamaHost)
+
+	if err := client.Ping(); err != nil {
+		return fmt.Errorf("ollama not reachable: %w", err)
+	}
+
+	if ok, _ := client.HasModel(cfg.VisionModel); !ok {
+		return fmt.Errorf("vision model missing: %s", cfg.VisionModel)
+	}
+
+	if ok, _ := client.HasModel(cfg.SelectModel); !ok {
+		return fmt.Errorf("select model missing: %s", cfg.SelectModel)
+	}
 
 	return nil
 }
@@ -121,4 +124,22 @@ func listImages(dir string) ([]string, error) {
 	}
 
 	return images, nil
+}
+
+func needsOllama(cfg *config.Config, wd *workdir.WorkDir) bool {
+	if cfg.Force {
+		return true
+	}
+
+	// Captioning cache
+	if !wd.Exists("images/captions.json") {
+		return true
+	}
+
+	// Timeline cache
+	if !wd.Exists("timeline.json") {
+		return true
+	}
+
+	return false
 }

@@ -261,13 +261,13 @@ var planCmd = &cobra.Command{
 			return fmt.Errorf("--images is required")
 		}
 
-		// Run preflight for Ollama
-		if err := pipeline.Preflight(cfg); err != nil {
+		wd, err := workdir.New(cfg)
+		if err != nil {
 			return err
 		}
 
-		wd, err := workdir.New(cfg)
-		if err != nil {
+		// Run preflight for Ollama
+		if err := pipeline.Preflight(cfg, wd); err != nil {
 			return err
 		}
 

@@ -11,17 +11,17 @@ import (
 
 // Run executes the full pipeline
 func Run(cfg *config.Config) error {
-	// Step 0: Preflight
-	if err := Preflight(cfg); err != nil {
-		return fmt.Errorf("preflight failed: %w", err)
-	}
-
 	// Initialize work directory
 	wd, err := workdir.New(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create work directory: %w", err)
 	}
 	fmt.Printf("==> Work directory: %s\n", wd.Root)
+
+	// Step 0: Preflight
+	if err := Preflight(cfg, wd); err != nil {
+		return fmt.Errorf("preflight failed: %w", err)
+	}
 
 	// Step 1: Normalize audio
 	_, err = NormalizeAudio(wd, cfg.AudioPath, cfg.Force)
