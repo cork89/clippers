@@ -33,6 +33,13 @@ func Preflight(cfg *config.Config) error {
 	}
 	fmt.Printf("  ✓ whisper.cpp found: %s\n", whisperBin)
 
+	// Check SubtitleEdit
+	subtitleEditBin := findSubtitleEdit()
+	if subtitleEditBin == "" {
+		return fmt.Errorf("SubtitleEdit not found in PATH or common locations")
+	}
+	fmt.Printf("  ✓ SubtitleEdit found: %s\n", subtitleEditBin)
+
 	// Check Ollama
 	client := ollama.NewClient(cfg.OllamaHost)
 	if err := client.Ping(); err != nil {

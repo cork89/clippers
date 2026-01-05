@@ -214,9 +214,6 @@ var renderCmd = &cobra.Command{
 		if !wd.Exists("timeline.json") {
 			return fmt.Errorf("no timeline found. Run 'clippers run' first")
 		}
-		if !wd.Exists("subtitles.srt") {
-			return fmt.Errorf("no subtitles found. Run 'clippers run' first")
-		}
 		if !wd.Exists("audio.wav") {
 			return fmt.Errorf("no normalized audio found. Run 'clippers run' first")
 		}
@@ -226,9 +223,20 @@ var renderCmd = &cobra.Command{
 			return err
 		}
 
-		srtPath := wd.Path("subtitles.srt")
+		// Prefer processed ASS, fall back to SRT
+		subtitleAspects := make([]types.SubtitleAspect, 0)
 
-		outputs, err := pipeline.RenderAll(wd, cfg, &timeline, srtPath)
+		for _, aspect := range cfg.Aspects {
+			if wd.Exists(fmt.Sprintf("subtitles_%s.ass", aspect)) {
+				subtitleAspects = append(subtitleAspects, types.SubtitleAspect{Aspect: aspect, Path: wd.Path(fmt.Sprintf("subtitles_%s.ass", aspect))})
+			} else if wd.Exists("subtitles.srt") {
+				subtitleAspects = append(subtitleAspects, types.SubtitleAspect{Aspect: aspect, Path: wd.Path("subtitles.srt")})
+			} else {
+				return fmt.Errorf("no subtitles found. Run 'clippers run' first")
+			}
+		}
+
+		outputs, err := pipeline.RenderAll(wd, cfg, &timeline, subtitleAspects)
 		if err != nil {
 			return err
 		}

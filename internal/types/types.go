@@ -47,3 +47,8 @@ type SRTCue struct {
 	End   float64
 	Text  string
 }
+
+type SubtitleAspect struct {
+	Aspect string
+	Path   string
+}
