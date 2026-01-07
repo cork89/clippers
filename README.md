@@ -1,7 +1,7 @@
 # Clippers – Audio Clip to Video  
 **Local-first, AI-driven, multi-format video generator**
 
-Turn a 10-30 s audio clip and a small folder of images into **three ready-to-post videos** (1:1, 16:9, 9:16) with zero cloud calls after the one-time model download.
+Turn a 10-30 s audio clip and a small folder of images into a subtitled video
 
 ---
 
@@ -9,7 +9,7 @@ Turn a 10-30 s audio clip and a small folder of images into **three ready-to-pos
 
 1. **Transcribes** the audio locally (Whisper.cpp)  
 2. **Captions** every image with a vision LLM (Ollama `llava`)  
-3. **Matches** images to spoken content with a text LLM (Ollama `llama3.1`)  
+3. **Matches** images to spoken content with a text LLM (Ollama `gemma3`)  
 4. **Renders** three MP4s with:
    - Hard-cut edits (≥ 2.5 s per shot)  
    - Blurred background + centred foreground  
@@ -76,14 +76,14 @@ clippers run -a <audio> -i <images> -o <output> [flags]
 | flag | default | meaning |
 |------|---------|---------|
 | `--aspects` | `1x1,16x9,9x16` | comma-separated list (`1x1` `16x9` `9x16`) |
-| `--min-shot` | `2.5` | minimum shot length (seconds) |
+| `--min-shot` | `4` | minimum shot length (seconds) |
 | `--max-words` | `5` | words per subtitle cue |
 | `--blur` | `20` | background blur strength |
-| `--font-size` | `24` | base subtitle font size |
+| `--font-size` | `40` | base subtitle font size |
 | `--whisper-model` | `medium.en` | whisper model |
 | `--ollama-host` | `http://localhost:11434` | Ollama API |
 | `--vision-model` | `llava:7b` | captioning model |
-| `--select-model` | `llama3.1:8b-instruct` | selection model |
+| `--select-model` | `gemma3:4b-it-qat` | selection model |
 | `--force` | `false` | ignore cache |
 
 ### Debug helpers
@@ -130,7 +130,7 @@ The prompts are hard-coded for the MVP. Edit these files if you need tighter cap
 ├── images/
 │   ├── captions.json   # llava results
 ├── text/
-│   └── windows.json    # 2.5-s windows
+│   └── windows.json    # 5s windows
 ├── timeline.json       # final shot list
 ├── subtitles.srt       # chunked subs
 └── render/
@@ -158,17 +158,9 @@ Delete `.work` or use `--force` to regenerate any stage.
 ## Road-map / Non-Goals
 
 **MVP (done)**  
-✔ local whisper, llava, llama3.1  
+✔ local whisper, llava, gemma3 
 ✔ 1:1 / 16:9 / 9:16 outputs  
 ✔ hard cuts, blur background, centered image, bottom-center subs  
-
-**Future (not MVP)**  
-- word-level alignment (WhisperX)  
-- transitions (fades)  
-- safe-area subtitle placement  
-- CLIP embeddings fallback  
-- GUI / drag-drop  
-- cloud upload hooks  
 
 ---
 
