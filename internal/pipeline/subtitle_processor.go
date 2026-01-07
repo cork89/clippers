@@ -21,7 +21,7 @@ import (
 // ------------------------------------------------------------
 
 const (
-	FontSize            = 48
+	// FontSize            = 48
 	BoxPadding          = 3
 	CornerRadius        = 8
 	VerticalPositionPct = 0.7
@@ -65,9 +65,9 @@ func NewFontMeasurer(path string, size float64) (*FontMeasurer, error) {
 	}, nil
 }
 
-func (fm *FontMeasurer) TextWidth(text string) int {
+func (fm *FontMeasurer) TextWidth(text string, fontSize int) int {
 	if fm == nil || fm.font == nil {
-		return len([]rune(text)) * FontSize / 3
+		return len([]rune(text)) * fontSize / 3
 	}
 
 	var w fixed.Int26_6
@@ -83,7 +83,7 @@ func (fm *FontMeasurer) TextWidth(text string) int {
 		w += adv
 	}
 
-	return int(float64(w) * float64(FontSize) / 64 / float64(fm.ppem))
+	return int(float64(w) * float64(fontSize) / 64 / float64(fm.ppem))
 }
 
 // ------------------------------------------------------------
@@ -137,7 +137,7 @@ func addRoundedBackground(input string, subtitleAspect types.SubtitleAspect, asp
 		return err
 	}
 
-	fm, err := NewFontMeasurer(defaultFontPath(), FontSize)
+	fm, err := NewFontMeasurer(defaultFontPath(), float64(aspectCfg.FontSize))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not load font (%v), using fallback estimation\n", err)
 	}
@@ -187,12 +187,12 @@ func addRoundedBackground(input string, subtitleAspect types.SubtitleAspect, asp
 		if styleInjected && strings.HasPrefix(trim, "Format:") {
 			out = append(out, line)
 			out = append(out,
-				"Style: RoundedBox,Asap Condensed Medium,"+strconv.Itoa(FontSize)+
+				"Style: RoundedBox,Asap Condensed Medium,"+strconv.Itoa(aspectCfg.FontSize)+
 					",&H30000000,&H00000000,&H00000000,&H00000000,"+
 					"0,0,0,0,100,100,0,0,1,0,0,5,10,10,10,1",
 			)
 			out = append(out,
-				"Style: SubText,Asap Condensed Medium,"+strconv.Itoa(FontSize)+
+				"Style: SubText,Asap Condensed Medium,"+strconv.Itoa(aspectCfg.FontSize)+
 					",&H00FFFFFF,&H00000000,&H00000000,&H00000000,"+
 					"1,0,0,0,100,100,0,0,1,0,0,5,10,10,10,1",
 			)
@@ -214,8 +214,8 @@ func addRoundedBackground(input string, subtitleAspect types.SubtitleAspect, asp
 			}
 
 			plain := removeTags(fields[9])
-			boxW := fm.TextWidth(plain) + BoxPadding*2 - 20
-			boxH := FontSize + BoxPadding*2
+			boxW := fm.TextWidth(plain, aspectCfg.FontSize) + BoxPadding*2 - 20
+			boxH := aspectCfg.FontSize + BoxPadding*2
 			path := roundedRectPath(boxW, boxH, CornerRadius)
 
 			posX := aspectCfg.Width / 2

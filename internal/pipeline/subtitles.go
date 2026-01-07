@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -10,8 +11,18 @@ import (
 	"github.com/cork89/clippers/internal/workdir"
 )
 
-// GenerateSubtitles creates chunked SRT from transcript
-func GenerateSubtitles(wd *workdir.WorkDir, cfg *config.Config, transcript *types.Transcript, force bool) (string, error) {
+// quantizeToFrameRate rounds time to nearest frame boundary
+func quantizeToFrameRate(seconds float64, fps int) float64 {
+	if fps <= 0 {
+		fps = 24
+	}
+	frameDuration := 1.0 / float64(fps)
+	frames := seconds / frameDuration
+	return math.Round(frames) * frameDuration
+}
+
+// GenerateSubtitles creates chunked SRT from transcript with strict contiguity
+func GenerateSubtitles(wd *workdir.WorkDir, cfg *config.Config, transcript *types.Transcript, timeline *types.Timeline, force bool) (string, error) {
 	srtPath := wd.Path("subtitles.srt")
 
 	if !force && wd.Exists("subtitles.srt") {
@@ -23,7 +34,9 @@ func GenerateSubtitles(wd *workdir.WorkDir, cfg *config.Config, transcript *type
 
 	var cues []types.SRTCue
 	cueIndex := 1
+	minDuration := 1.0 / float64(cfg.FPS)
 
+	// Process transcript segments sequentially (not timeline entries)
 	for _, seg := range transcript.Segments {
 		words := strings.Fields(seg.Text)
 		if len(words) == 0 {
@@ -43,7 +56,7 @@ func GenerateSubtitles(wd *workdir.WorkDir, cfg *config.Config, transcript *type
 			chunkWords := words[i:end]
 			chunkText := strings.Join(chunkWords, " ")
 
-			// Approximate timing within segment
+			// Calculate timing
 			startRatio := float64(i) / float64(len(words))
 			endRatio := float64(end) / float64(len(words))
 
@@ -51,11 +64,38 @@ func GenerateSubtitles(wd *workdir.WorkDir, cfg *config.Config, transcript *type
 			cueEnd := seg.Start + (segDuration * endRatio)
 
 			// Ensure minimum duration
-			if cueEnd-cueStart < 0.5 {
-				cueEnd = cueStart + 0.5
+			if cueEnd-cueStart < minDuration {
+				cueEnd = cueStart + minDuration
+			}
+
+			// Clamp to segment bounds
+			if cueStart < seg.Start {
+				cueStart = seg.Start
 			}
 			if cueEnd > seg.End {
 				cueEnd = seg.End
+			}
+
+			// Quantize to frame boundaries
+			cueStart = quantizeToFrameRate(cueStart, cfg.FPS)
+			cueEnd = quantizeToFrameRate(cueEnd, cfg.FPS)
+
+			// Force contiguity: ensure no gaps or overlaps with previous cue
+			if len(cues) > 0 {
+				prevCue := &cues[len(cues)-1]
+				// If current start is before previous end, adjust it
+				if cueStart < prevCue.End {
+					cueStart = prevCue.End
+				}
+				// If there's a tiny gap, close it
+				if cueStart > prevCue.End && cueStart-prevCue.End < minDuration*2 {
+					cueStart = prevCue.End
+				}
+			}
+
+			// Skip if duration is too small after adjustments
+			if cueEnd-cueStart < minDuration/2 {
+				continue
 			}
 
 			cues = append(cues, types.SRTCue{
@@ -85,6 +125,9 @@ func GenerateSubtitles(wd *workdir.WorkDir, cfg *config.Config, transcript *type
 }
 
 func formatSRTTime(seconds float64) string {
+	// Add epsilon to prevent rounding errors
+	seconds += 0.000001
+
 	h := int(seconds) / 3600
 	m := (int(seconds) % 3600) / 60
 	s := int(seconds) % 60

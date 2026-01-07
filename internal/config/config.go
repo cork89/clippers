@@ -1,4 +1,41 @@
+// ./internal/config/config.go
 package config
+
+// ShaderType represents available shader effects
+type ShaderType string
+
+const (
+	ShaderNone         ShaderType = "none"
+	ShaderWaveDisplace ShaderType = "wave_displace"
+	ShaderEdgeGlow     ShaderType = "edge_glow"
+	ShaderLiquidFlow   ShaderType = "liquid_flow"
+	ShaderPixelMelt    ShaderType = "pixel_melt"
+	ShaderRetro        ShaderType = "retro"
+	ShaderVoronoi      ShaderType = "voronoi"
+)
+
+// ValidShaders returns all available shader options
+func ValidShaders() []ShaderType {
+	return []ShaderType{
+		ShaderNone,
+		ShaderWaveDisplace,
+		ShaderEdgeGlow,
+		ShaderLiquidFlow,
+		ShaderPixelMelt,
+		ShaderRetro,
+		ShaderVoronoi,
+	}
+}
+
+// IsValidShader checks if a shader name is valid
+func IsValidShader(s string) bool {
+	for _, shader := range ValidShaders() {
+		if string(shader) == s {
+			return true
+		}
+	}
+	return false
+}
 
 // Config holds all configuration for a run
 type Config struct {
@@ -20,6 +57,8 @@ type Config struct {
 	MaxWords     int
 	BlurStrength int
 	FPS          int
+	Shader       ShaderType // Shader effect to apply
+	ShadersDir   string     // Directory containing shader files
 
 	// Subtitle settings
 	FontSize       int
@@ -46,13 +85,15 @@ func DefaultConfig() *Config {
 	return &Config{
 		WorkDir:            ".work",
 		Aspects:            []string{"1x1", "16x9", "9x16"},
-		MinShotSec:         2.5,
+		MinShotSec:         5,
 		MaxWords:           5,
 		BlurStrength:       20,
 		FPS:                24,
-		FontSize:           24,
+		Shader:             ShaderNone,
+		ShadersDir:         "shaders",
+		FontSize:           60,
 		SubtitleMargin:     20,
-		DefaultImageWeight: 0.5, // Use default if confidence below this
+		DefaultImageWeight: 0.5,
 		TitleWeight:        "high",
 		WhisperModel:       "medium.en",
 		OllamaHost:         "http://localhost:11434",
@@ -107,10 +148,4 @@ func GetAspectConfig(aspect string, baseFontSize int) AspectConfig {
 			MaxLineChars: 40,
 		}
 	}
-}
-
-// AspectDimensions returns width and height for an aspect ratio
-func AspectDimensions(aspect string) (int, int) {
-	cfg := GetAspectConfig(aspect, 24)
-	return cfg.Width, cfg.Height
 }

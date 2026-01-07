@@ -53,12 +53,11 @@ func Run(cfg *config.Config) error {
 		return fmt.Errorf("timeline planning failed: %w", err)
 	}
 
-	// Step 6: Generate subtitles (SRT)
-	srtPath, err := GenerateSubtitles(wd, cfg, transcript, cfg.Force)
+	// Step 6: Generate subtitles (SRT) - NOW SYNCHRONIZED WITH TIMELINE
+	srtPath, err := GenerateSubtitles(wd, cfg, transcript, timeline, cfg.Force)
 	if err != nil {
 		return fmt.Errorf("subtitle generation failed: %w", err)
 	}
-
 	// Step 7: Convert to ASS and add rounded backgrounds
 	assPaths, err := ConvertAndProcessSubtitles(wd, cfg, srtPath, cfg.Force)
 	if err != nil {

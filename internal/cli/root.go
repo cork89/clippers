@@ -1,3 +1,4 @@
+// ./internal/cli/root.go
 package cli
 
 import (
@@ -14,6 +15,7 @@ import (
 
 var cfg = config.DefaultConfig()
 var aspectsFlag string
+var shaderFlag string
 
 var rootCmd = &cobra.Command{
 	Use:   "clippers",
@@ -43,6 +45,13 @@ var runCmd = &cobra.Command{
 			if !isValidAspect(aspect) {
 				return fmt.Errorf("invalid aspect ratio: %s (valid: 1x1, 16x9, 9x16)", aspect)
 			}
+		}
+
+		if shaderFlag != "" {
+			if !config.IsValidShader(shaderFlag) {
+				return fmt.Errorf("invalid shader: %s (valid: %s)", shaderFlag, validShadersStr())
+			}
+			cfg.Shader = config.ShaderType(shaderFlag)
 		}
 
 		return pipeline.Run(cfg)
@@ -206,6 +215,13 @@ var renderCmd = &cobra.Command{
 			cfg.Aspects = parseAspects(aspectsFlag)
 		}
 
+		if shaderFlag != "" {
+			if !config.IsValidShader(shaderFlag) {
+				return fmt.Errorf("invalid shader: %s (valid: %s)", shaderFlag, validShadersStr())
+			}
+			cfg.Shader = config.ShaderType(shaderFlag)
+		}
+
 		wd, err := workdir.New(cfg)
 		if err != nil {
 			return err
@@ -306,6 +322,42 @@ var planCmd = &cobra.Command{
 	},
 }
 
+var shadersCmd = &cobra.Command{
+	Use:   "shaders",
+	Short: "List available shader effects",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Available shaders:")
+		fmt.Println()
+		for _, shader := range config.ValidShaders() {
+			desc := shaderDescription(shader)
+			fmt.Printf("  %-15s %s\n", shader, desc)
+		}
+		fmt.Println()
+		fmt.Println("Use --shader=<name> with 'run' or 'render' commands")
+	},
+}
+
+func shaderDescription(s config.ShaderType) string {
+	switch s {
+	case config.ShaderNone:
+		return "(no effect)"
+	case config.ShaderWaveDisplace:
+		return "RGB channel wave displacement with chromatic aberration"
+	case config.ShaderEdgeGlow:
+		return "Neon edge detection with cyan/pink pulse"
+	case config.ShaderLiquidFlow:
+		return "Liquid pastel marble warping effect"
+	case config.ShaderPixelMelt:
+		return "Digital pixel melting based on brightness"
+	case config.ShaderRetro:
+		return "VHS tape effect with tracking, grain, and scanlines"
+	case config.ShaderVoronoi:
+		return "Geometric mosaic with soft sweeping shine"
+	default:
+		return ""
+	}
+}
+
 func init() {
 	// Common flags
 	persistentFlags := rootCmd.PersistentFlags()
@@ -314,6 +366,7 @@ func init() {
 	persistentFlags.StringVar(&cfg.VisionModel, "vision-model", "llava", "Vision model for captioning")
 	persistentFlags.StringVar(&cfg.SelectModel, "select-model", "gemma3:4b-it-qat", "Model for image selection")
 	persistentFlags.BoolVar(&cfg.Force, "force", false, "Force recompute all stages")
+	persistentFlags.StringVar(&cfg.ShadersDir, "shaders-dir", "shaders", "Directory containing shader files")
 
 	// Run command flags
 	runCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
@@ -321,10 +374,11 @@ func init() {
 	runCmd.Flags().StringVarP(&cfg.OutputDir, "out", "o", "output", "Output directory")
 	runCmd.Flags().StringVarP(&cfg.Title, "title", "t", "", "Video title (used for image selection context)")
 	runCmd.Flags().StringVar(&aspectsFlag, "aspects", "1x1,16x9,9x16", "Aspect ratios to render")
-	runCmd.Flags().Float64Var(&cfg.MinShotSec, "min-shot", 2.5, "Minimum shot duration in seconds")
-	runCmd.Flags().IntVar(&cfg.MaxWords, "max-words", 5, "Maximum words per subtitle chunk")
-	runCmd.Flags().IntVar(&cfg.BlurStrength, "blur", 20, "Background blur strength")
-	runCmd.Flags().IntVar(&cfg.FontSize, "font-size", 24, "Base subtitle font size")
+	runCmd.Flags().StringVar(&shaderFlag, "shader", "none", "Shader effect to apply (use 'clippers shaders' to list)")
+	runCmd.Flags().Float64Var(&cfg.MinShotSec, "min-shot", cfg.MinShotSec, "Minimum shot duration in seconds")
+	runCmd.Flags().IntVar(&cfg.MaxWords, "max-words", cfg.MaxWords, "Maximum words per subtitle chunk")
+	runCmd.Flags().IntVar(&cfg.BlurStrength, "blur", cfg.BlurStrength, "Background blur strength")
+	runCmd.Flags().IntVar(&cfg.FontSize, "font-size", cfg.FontSize, "Base subtitle font size")
 	runCmd.Flags().Float64Var(&cfg.DefaultImageWeight, "default-threshold", 0.5, "Confidence threshold below which default image is used")
 	runCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
 
@@ -345,14 +399,15 @@ func init() {
 	renderCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
 	renderCmd.Flags().StringVarP(&cfg.OutputDir, "out", "o", "output", "Output directory")
 	renderCmd.Flags().StringVar(&aspectsFlag, "aspects", "1x1,16x9,9x16", "Aspect ratios to render")
-	renderCmd.Flags().IntVar(&cfg.BlurStrength, "blur", 20, "Background blur strength")
-	renderCmd.Flags().IntVar(&cfg.FontSize, "font-size", 24, "Base subtitle font size")
+	renderCmd.Flags().StringVar(&shaderFlag, "shader", "none", "Shader effect to apply")
+	renderCmd.Flags().IntVar(&cfg.BlurStrength, "blur", cfg.BlurStrength, "Background blur strength")
+	renderCmd.Flags().IntVar(&cfg.FontSize, "font-size", cfg.FontSize, "Base subtitle font size")
 
 	// Plan command flags
 	planCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
 	planCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
 	planCmd.Flags().StringVarP(&cfg.Title, "title", "t", "", "Video title (used for image selection context)")
-	planCmd.Flags().Float64Var(&cfg.MinShotSec, "min-shot", 2.5, "Minimum shot duration in seconds")
+	planCmd.Flags().Float64Var(&cfg.MinShotSec, "min-shot", 5, "Minimum shot duration in seconds")
 	planCmd.Flags().Float64Var(&cfg.DefaultImageWeight, "default-threshold", 0.5, "Confidence threshold for default image")
 	planCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
 
@@ -362,6 +417,7 @@ func init() {
 	rootCmd.AddCommand(previewCmd)
 	rootCmd.AddCommand(renderCmd)
 	rootCmd.AddCommand(planCmd)
+	rootCmd.AddCommand(shadersCmd)
 }
 
 func Execute() error {
@@ -387,4 +443,12 @@ func isValidAspect(aspect string) bool {
 	default:
 		return false
 	}
+}
+
+func validShadersStr() string {
+	var names []string
+	for _, s := range config.ValidShaders() {
+		names = append(names, string(s))
+	}
+	return strings.Join(names, ", ")
 }
