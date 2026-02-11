@@ -3,6 +3,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -339,16 +340,39 @@ var shadersCmd = &cobra.Command{
 }
 
 var serverPort int
+var projectsDir string
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Start the web UI server",
-	Long:  "Start a local web server for the interactive timeline editor",
+	Long:  "Start a local web server for the interactive timeline editor. If --audio and --images are not provided, shows a project selector using --projects-dir.",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// If projects directory is specified or audio/images not provided, use project selector mode
+		useProjectSelector := projectsDir != "" || (cfg.AudioPath == "" && cfg.ImagesDir == "")
+
+		if useProjectSelector {
+			if projectsDir == "" {
+				projectsDir = "projects"
+			}
+
+			// Validate projects directory exists
+			if _, err := os.Stat(projectsDir); err != nil {
+				return fmt.Errorf("projects directory not found: %s", projectsDir)
+			}
+
+			fmt.Printf("Starting server with project selector (projects dir: %s)\n", projectsDir)
+			fmt.Printf("Open http://localhost:%d in your browser\n\n", serverPort)
+
+			// Start server without a specific project loaded
+			server := webserver.NewServer(cfg, nil, serverPort, projectsDir)
+			return server.Start()
+		}
+
+		// Original mode: specific audio and images provided
 		if cfg.AudioPath == "" {
-			return fmt.Errorf("--audio is required")
+			return fmt.Errorf("--audio is required when not using project selector")
 		}
 		if cfg.ImagesDir == "" {
-			return fmt.Errorf("--images is required")
+			return fmt.Errorf("--images is required when not using project selector")
 		}
 
 		wd, err := workdir.New(cfg)
@@ -391,8 +415,8 @@ var serverCmd = &cobra.Command{
 			fmt.Printf("Timeline created successfully!\n\n")
 		}
 
-		// Start the web server
-		server := webserver.NewServer(cfg, wd, serverPort)
+		// Start the web server with specific project
+		server := webserver.NewServer(cfg, wd, serverPort, "")
 		return server.Start()
 	},
 }
@@ -472,8 +496,9 @@ func init() {
 	planCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
 
 	// Server command flags
-	serverCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
-	serverCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
+	serverCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (optional if using --projects-dir)")
+	serverCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (optional if using --projects-dir)")
+	serverCmd.Flags().StringVar(&projectsDir, "projects-dir", "", "Directory containing project folders (default: 'projects' if audio/images not specified)")
 	serverCmd.Flags().StringVarP(&cfg.Title, "title", "t", "", "Video title")
 	serverCmd.Flags().IntVarP(&serverPort, "port", "p", 8080, "Server port")
 	serverCmd.Flags().Float64Var(&cfg.MinShotSec, "min-shot", 5, "Minimum shot duration in seconds")

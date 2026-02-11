@@ -1,0 +1,96 @@
+// ./internal/views/projects.templ
+package views
+
+import "fmt"
+
+type ProjectsData struct {
+	Projects []ProjectInfo
+	BasePath string
+}
+
+type ProjectInfo struct {
+	Name       string
+	AudioFile  string
+	HasImages  bool
+	ImageCount int
+	ModifiedAt string
+}
+
+templ ProjectSelector(data ProjectsData) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Select Project - Clippers</title>
+			<script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
+			<link rel="stylesheet" href="/static/style.css"/>
+		</head>
+		<body class="projects-page">
+			<header class="app-header">
+				<h1>🎬 Clippers - Select Project</h1>
+			</header>
+			
+			<main class="projects-main">
+				if len(data.Projects) == 0 {
+					<div class="no-projects">
+						<h2>No Projects Found</h2>
+						<p>Create a "projects" directory in the current folder and add project folders containing:</p>
+						<ul>
+							<li>An MP3 audio file</li>
+							<li>An "images" folder with your images</li>
+						</ul>
+						<div class="example-structure">
+							<pre>
+projects/
+├── my-video/
+│   ├── audio.mp3
+│   └── images/
+│       ├── image1.jpg
+│       └── image2.png
+└── another-project/
+    ├── podcast.mp3
+    └── images/
+							</pre>
+						</div>
+					</div>
+				} else {
+					<div class="projects-grid">
+						for _, project := range data.Projects {
+							<div class="project-card">
+								<div class="project-header">
+									<h3>{ project.Name }</h3>
+									<span class="project-date">{ project.ModifiedAt }</span>
+								</div>
+								<div class="project-details">
+									<div class="detail-item">
+										<span class="detail-label">Audio:</span>
+										<span class="detail-value">{ project.AudioFile }</span>
+									</div>
+									if project.HasImages {
+										<div class="detail-item">
+											<span class="detail-label">Images:</span>
+											<span class="detail-value">{ formatImageCount(project.ImageCount) }</span>
+										</div>
+									}
+								</div>
+								<div class="project-actions">
+									<a href={ templ.SafeURL(data.BasePath + "/project/" + project.Name) } class="btn btn-primary">
+										Open Project
+									</a>
+								</div>
+							</div>
+						}
+					</div>
+				}
+			</main>
+		</body>
+	</html>
+}
+
+func formatImageCount(count int) string {
+	if count == 1 {
+		return "1 image"
+	}
+	return fmt.Sprintf("%d images", count)
+}

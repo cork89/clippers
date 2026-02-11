@@ -160,6 +160,19 @@ The application requires these external binaries:
 - `whisper.cpp`: Audio transcription
 - `ollama`: LLM inference server
 
+## Development Commands
+
+```bash
+# Run development server with hot reload (requires Air)
+air
+
+# Install Air live reload tool
+go install github.com/cosmtrek/air@latest
+
+# Generate templ files manually
+templ generate
+```
+
 ## Common Tasks
 
 ```bash
@@ -171,4 +184,18 @@ The application requires these external binaries:
 
 # Re-render from cached timeline
 ./clippers.exe render -a audio.mp3 -i ./images
+
+# Start web server with project selector
+./clippers.exe server
+
+# Start web server with specific project
+./clippers.exe server -a audio.mp3 -i ./images
 ```
+
+## Air Configuration
+
+The project includes an `.air.toml` configuration file for live reload development:
+- Watches Go files and rebuilds the binary automatically
+- Watches Templ files and regenerates them via `templ generate`
+- Excludes work directories, output, and other generated files
+- Keeps scroll position on rebuild for better dev experience

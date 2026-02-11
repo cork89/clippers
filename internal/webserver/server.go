@@ -24,19 +24,22 @@ import (
 
 // Server holds the HTTP server and its dependencies
 type Server struct {
-	config   *config.Config
-	workDir  *workdir.WorkDir
-	mux      *http.ServeMux
-	server   *http.Server
-	upgrader *websocket.Upgrader
+	config         *config.Config
+	workDir        *workdir.WorkDir
+	mux            *http.ServeMux
+	server         *http.Server
+	upgrader       *websocket.Upgrader
+	projectsDir    string
+	currentProject string
 }
 
 // NewServer creates a new web server instance
-func NewServer(cfg *config.Config, workDir *workdir.WorkDir, port int) *Server {
+func NewServer(cfg *config.Config, workDir *workdir.WorkDir, port int, projectsDir string) *Server {
 	s := &Server{
-		config:  cfg,
-		workDir: workDir,
-		mux:     http.NewServeMux(),
+		config:      cfg,
+		workDir:     workDir,
+		mux:         http.NewServeMux(),
+		projectsDir: projectsDir,
 		upgrader: &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return true // Local development only
@@ -59,8 +62,12 @@ func (s *Server) setupRoutes() {
 	// Static files
 	s.mux.HandleFunc("/static/", s.handleStatic)
 
-	// Main page
+	// Main page - shows project selector if no project loaded, otherwise timeline
 	s.mux.HandleFunc("/", s.handleIndex)
+
+	// Project selection and loading
+	s.mux.HandleFunc("/project/", s.handleOpenProject)
+	s.mux.HandleFunc("/api/projects", s.handleProjectsList)
 
 	// API routes - JSON
 	s.mux.HandleFunc("/api/project", s.handleProject)
@@ -105,6 +112,147 @@ func (s *Server) Start() error {
 	return s.server.Shutdown(ctx)
 }
 
+// handleIndex serves the main application page or project selector
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// If we have a loaded project with timeline, show the editor
+	if s.workDir != nil && s.workDir.Exists("timeline.json") {
+		component := views.Layout("Timeline Editor")
+		component.Render(r.Context(), w)
+		return
+	}
+
+	// Otherwise show project selector
+	s.showProjectSelector(w, r)
+}
+
+// showProjectSelector displays the project selection page
+func (s *Server) showProjectSelector(w http.ResponseWriter, r *http.Request) {
+	projects, err := DiscoverProjects(s.projectsDir)
+	if err != nil {
+		log.Printf("Error discovering projects: %v", err)
+	}
+
+	viewProjects := make([]views.ProjectInfo, len(projects))
+	for i, p := range projects {
+		viewProjects[i] = views.ProjectInfo{
+			Name:       p.Name,
+			AudioFile:  p.AudioFile,
+			HasImages:  p.HasImages,
+			ImageCount: p.ImageCount,
+			ModifiedAt: p.ModifiedAt.Format("Jan 2, 2006 3:04 PM"),
+		}
+	}
+
+	data := views.ProjectsData{
+		Projects: viewProjects,
+		BasePath: "",
+	}
+
+	component := views.ProjectSelector(data)
+	component.Render(r.Context(), w)
+}
+
+// handleProjectsList returns the list of projects as JSON
+func (s *Server) handleProjectsList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	projects, err := DiscoverProjects(s.projectsDir)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to list projects: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(projects)
+}
+
+// handleOpenProject loads a specific project
+func (s *Server) handleOpenProject(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/project/")
+	if path == "" {
+		http.Error(w, "Project name required", http.StatusBadRequest)
+		return
+	}
+
+	// Sanitize project name to prevent directory traversal
+	projectName := filepath.Base(path)
+	projectPath := filepath.Join(s.projectsDir, projectName)
+
+	// Verify the project exists and is valid
+	projects, err := DiscoverProjects(s.projectsDir)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to list projects: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	var foundProject *ProjectInfo
+	for i := range projects {
+		if projects[i].Name == projectName {
+			foundProject = &projects[i]
+			break
+		}
+	}
+
+	if foundProject == nil {
+		http.Error(w, "Project not found", http.StatusNotFound)
+		return
+	}
+
+	// Update config with project paths
+	s.config.AudioPath = filepath.Join(projectPath, foundProject.AudioFile)
+	s.config.ImagesDir = foundProject.ImagesDir
+	s.currentProject = projectName
+
+	// Create workdir for this project
+	wd, err := workdir.New(s.config)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create work directory: %v", err), http.StatusInternalServerError)
+		return
+	}
+	s.workDir = wd
+
+	// Check if we need to run the pipeline
+	if !wd.Exists("timeline.json") {
+		// Redirect to a loading page or show a message that processing is needed
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+    <title>Processing Project - Clippers</title>
+    <link rel="stylesheet" href="/static/style.css"/>
+    <meta http-equiv="refresh" content="5;url=/">
+</head>
+<body class="projects-page">
+    <header class="app-header">
+        <h1>🎬 Clippers</h1>
+    </header>
+    <main class="projects-main">
+        <div class="no-projects">
+            <h2>Project Needs Processing</h2>
+            <p>This project hasn't been processed yet. Please run the CLI command:</p>
+            <pre style="background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto;">
+clippers server -a "` + s.config.AudioPath + `" -i "` + s.config.ImagesDir + `"</pre>
+            <p>Or use the <code>clippers run</code> command first to create the timeline.</p>
+            <p><a href="/" class="btn btn-primary">Back to Projects</a></p>
+        </div>
+    </main>
+</body>
+</html>`))
+		return
+	}
+
+	// Redirect to the timeline editor
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 // handleStatic serves static files (CSS, JS)
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/static/")
@@ -119,21 +267,15 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, staticPath)
 }
 
-// handleIndex serves the main application page
-func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-
-	component := views.Layout("Timeline Editor")
-	component.Render(r.Context(), w)
-}
-
 // handleProject returns project metadata
 func (s *Server) handleProject(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
 		return
 	}
 
@@ -161,6 +303,11 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 
 // getTimeline handles GET /api/timeline
 func (s *Server) getTimeline(w http.ResponseWriter, r *http.Request) {
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
 	var timeline types.Timeline
 	if err := s.workDir.ReadJSON("timeline.json", &timeline); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read timeline: %v", err), http.StatusInternalServerError)
@@ -173,6 +320,11 @@ func (s *Server) getTimeline(w http.ResponseWriter, r *http.Request) {
 
 // updateTimeline handles PUT /api/timeline
 func (s *Server) updateTimeline(w http.ResponseWriter, r *http.Request) {
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
 	var timeline types.Timeline
 	if err := json.NewDecoder(r.Body).Decode(&timeline); err != nil {
 		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
@@ -195,6 +347,11 @@ func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
 	var catalog pipeline.ImageCatalog
 	if err := s.workDir.ReadJSON("images/captions.json", &catalog); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read images: %v", err), http.StatusInternalServerError)
@@ -209,6 +366,11 @@ func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
 		return
 	}
 
@@ -250,6 +412,11 @@ func (s *Server) handleSegment(w http.ResponseWriter, r *http.Request) {
 
 // getSegment handles GET /api/segment/{id}
 func (s *Server) getSegment(w http.ResponseWriter, r *http.Request, segmentID string) {
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
 	var timeline types.Timeline
 	if err := s.workDir.ReadJSON("timeline.json", &timeline); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read timeline: %v", err), http.StatusInternalServerError)
@@ -303,6 +470,11 @@ func (s *Server) getSegment(w http.ResponseWriter, r *http.Request, segmentID st
 
 // handleSegmentOperation handles POST operations on segments
 func (s *Server) handleSegmentOperation(w http.ResponseWriter, r *http.Request, segmentID string, operation string) {
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
 	var timeline types.Timeline
 	if err := s.workDir.ReadJSON("timeline.json", &timeline); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read timeline: %v", err), http.StatusInternalServerError)
@@ -510,6 +682,11 @@ func (s *Server) handleImagesAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
 	var catalog pipeline.ImageCatalog
 	if err := s.workDir.ReadJSON("images/captions.json", &catalog); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read images: %v", err), http.StatusInternalServerError)
@@ -524,6 +701,12 @@ func (s *Server) handleImagesAPI(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTimelineHTML(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.workDir == nil {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<div class="loading"><p>No project loaded. <a href="/">Select a project</a></p></div>`))
 		return
 	}
 
@@ -557,6 +740,12 @@ func (s *Server) handleTimelineHTML(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleImagesHTML(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.workDir == nil {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<div class="loading"><p>No project loaded.</p></div>`))
 		return
 	}
 

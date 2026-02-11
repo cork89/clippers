@@ -1,0 +1,49 @@
+# Air configuration for Clippers development
+# https://github.com/cosmtrek/air
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+# Build command - builds Go binary (pre_cmd handles templ first)
+cmd = "go build -o tmp/main.exe ./cmd/clippers"
+
+# Pre-build command - runs templ generate BEFORE air checks for file changes
+pre_cmd = ["templ generate"]
+
+# Binary file (relative path from root)
+bin = "tmp/main.exe"
+
+# Arguments to pass to the binary - tells it to run the webserver
+args_bin = ["server"]
+
+# Watch file extensions
+include_ext = ["go", "templ", "html", "css", "js"]
+exclude_ext = ["md", "txt", "log"]
+
+# Watch directories
+include_dir = ["cmd", "internal", "assets", "shaders"]
+
+# Exclude directories  
+exclude_dir = ["tmp", ".work", "output", "projects", "node_modules", "vendor"]
+
+# Exclude generated files using regex (this prevents infinite rebuilds)
+exclude_regex = [".*_templ.go"]
+
+# Settings
+delay = 1000
+stop_on_error = true
+kill_delay = 500
+log = "build-errors.log"
+
+[log]
+time = true
+changed = true
+build = true
+
+[misc]
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = true
+keep_scroll = true
