@@ -11,7 +11,7 @@ Turn a 10-30 s audio clip and a small folder of images into a subtitled video
 2. **Captions** every image with a vision LLM (Ollama `llava`)  
 3. **Matches** images to spoken content with a text LLM (Ollama `gemma3`)  
 4. **Renders** three MP4s with:
-   - Hard-cut edits (≥ 2.5 s per shot)  
+   - Hard-cut edits (≥ 5 s per shot)  
    - Blurred background + centred foreground  
    - Bottom-center chunked subtitles  
    - 30 fps, H.264/AAC, yuv420p
@@ -85,6 +85,7 @@ clippers run -a <audio> -i <images> -o <output> [flags]
 | `--vision-model` | `llava:7b` | captioning model |
 | `--select-model` | `gemma3:4b-it-qat` | selection model |
 | `--force` | `false` | ignore cache |
+| `--shader` | `{none}` | shader to put on background images (i.e. liquid_flow or wave_displace) |
 
 ### Debug helpers
 ```

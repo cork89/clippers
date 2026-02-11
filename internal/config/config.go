@@ -97,7 +97,7 @@ func DefaultConfig() *Config {
 		TitleWeight:        "high",
 		WhisperModel:       "medium.en",
 		OllamaHost:         "http://localhost:11434",
-		VisionModel:        "llava",
+		VisionModel:        "gemma3:4b-it-qat",
 		SelectModel:        "gemma3:4b-it-qat",
 		Force:              false,
 	}

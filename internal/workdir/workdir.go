@@ -47,7 +47,7 @@ func New(cfg *config.Config) (*WorkDir, error) {
 	// Create subdirectories
 	for _, sub := range []string{"images", "text", "render"} {
 		if err := os.MkdirAll(filepath.Join(root, sub), 0755); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to make work directory: %w", err)
 		}
 	}
 
@@ -73,7 +73,7 @@ func New(cfg *config.Config) (*WorkDir, error) {
 	}
 
 	if err := wd.WriteJSON("project.json", project); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write project: %w", err)
 	}
 
 	return wd, nil
@@ -181,7 +181,7 @@ func NewForImages(cfg *config.Config) (*WorkDir, error) {
 
 	for _, sub := range []string{"images", "text", "render"} {
 		if err := os.MkdirAll(filepath.Join(root, sub), 0755); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to make work directory: %w", err)
 		}
 	}
 

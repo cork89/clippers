@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/cork89/clippers/internal/config"
@@ -91,7 +90,11 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 	}
 
 	// Get file size
-	info, _ := os.Stat(outputPath)
+	info, err := os.Stat(outputPath)
+	if err != nil {
+		return outputPath, fmt.Errorf("failed to get output file size, %w", err)
+	}
+
 	sizeMB := float64(info.Size()) / (1024 * 1024)
 
 	fmt.Printf("  ✓ Rendered: %s (%.1f MB)\n", outputPath, sizeMB)
@@ -286,12 +289,4 @@ func writeConcatFile(path string, timeline *types.Timeline) error {
 	}
 
 	return os.WriteFile(path, []byte(sb.String()), 0644)
-}
-
-func getVideoDuration(p string) float64 {
-	cmd := exec.Command("ffprobe", "-v", "error",
-		"-show_entries", "format=duration", "-of", "csv=p=0", p)
-	out, _ := cmd.Output()
-	f, _ := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
-	return f
 }

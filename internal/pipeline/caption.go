@@ -1,3 +1,4 @@
+// ./internal/pipeline/caption.go
 package pipeline
 
 import (
@@ -57,7 +58,7 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 		fmt.Println("==> Image captioning (cached)")
 		var catalog ImageCatalog
 		if err := wd.ReadJSON("images/captions.json", &catalog); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read captions: %w", err)
 		}
 		return &catalog, nil
 	}
@@ -90,14 +91,15 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 
 		caption, err := captionImage(client, cfg.VisionModel, imagePath)
 		if err != nil {
-			fmt.Printf("failed: %v\n", err)
-			caption = &ImageCaption{
-				ID:      imageID,
-				Path:    imagePath,
-				Caption: "An image",
-				Tags:    []string{"image", "visual"},
-				Style:   2,
-			}
+			return nil, fmt.Errorf("Failed to caption image, %v", err)
+			// fmt.Printf("failed: %v\n", err)
+			// caption = &ImageCaption{
+			// 	ID:      imageID,
+			// 	Path:    imagePath,
+			// 	Caption: "An image",
+			// 	Tags:    []string{"image", "visual"},
+			// 	Style:   2,
+			// }
 		} else {
 			caption.ID = imageID
 			caption.Path = imagePath
@@ -115,7 +117,7 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 	}
 
 	if err := wd.WriteJSON("images/captions.json", catalog); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to save captions: %w", err)
 	}
 
 	fmt.Printf("  ✓ Captioned %d images", len(catalog.Images))
@@ -130,14 +132,14 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 func captionImage(client *ollama.Client, model, imagePath string) (*ImageCaption, error) {
 	response, err := client.GenerateWithImage(model, captionPrompt, imagePath, true)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate captions: %w", err)
 	}
 
 	caption, err := parseCaptionResponse(response)
 	if err != nil {
 		response, err = client.GenerateWithImage(model, strictCaptionPrompt, imagePath, true)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to generate strict captions: %w", err)
 		}
 
 		caption, err = parseCaptionResponse(response)

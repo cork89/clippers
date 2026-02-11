@@ -1,3 +1,4 @@
+// ./internal/pipeline/preflight.go
 package pipeline
 
 import (
@@ -109,7 +110,7 @@ func listImages(dir string) ([]string, error) {
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	for _, e := range entries {

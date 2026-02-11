@@ -1,3 +1,4 @@
+// ./internal/pipeline/transcribe.go
 package pipeline
 
 import (
@@ -22,7 +23,7 @@ func Transcribe(wd *workdir.WorkDir, cfg *config.Config, force bool) (*types.Tra
 		fmt.Println("==> Transcription (cached)")
 		var t types.Transcript
 		if err := wd.ReadJSON("transcript.json", &t); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read transcript: %w", err)
 		}
 		return &t, nil
 	}
@@ -69,7 +70,7 @@ func Transcribe(wd *workdir.WorkDir, cfg *config.Config, force bool) (*types.Tra
 	transcript.Language = "en"
 
 	if err := wd.WriteJSON("transcript.json", transcript); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write transcript: %w", err)
 	}
 
 	fmt.Printf("  ✓ Transcribed %d segments (%.1fs)\n", len(transcript.Segments), duration)
@@ -101,7 +102,7 @@ func findWhisperModel(model string) string {
 func parseSRT(path string) (*types.Transcript, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open srt file: %w", err)
 	}
 	defer f.Close()
 

@@ -1,3 +1,4 @@
+// ./internal/pipeline/plan.go
 package pipeline
 
 import (
@@ -35,15 +36,13 @@ type SelectionResult struct {
 	MatchesSegment bool    `json:"matches_segment"`
 }
 
-const defaultImageName = "default.png"
-
 // BuildTextWindows creates fixed-duration windows with overlapping text
 func BuildTextWindows(wd *workdir.WorkDir, cfg *config.Config, transcript *types.Transcript, force bool) (*TextWindows, error) {
 	if !force && wd.Exists("text/windows.json") {
 		fmt.Println("==> Text windows (cached)")
 		var windows TextWindows
 		if err := wd.ReadJSON("text/windows.json", &windows); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read windows: %w", err)
 		}
 		return &windows, nil
 	}
@@ -81,7 +80,7 @@ func BuildTextWindows(wd *workdir.WorkDir, cfg *config.Config, transcript *types
 	result := &TextWindows{Windows: windows}
 
 	if err := wd.WriteJSON("text/windows.json", result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to save windows: %w", err)
 	}
 
 	fmt.Printf("  ✓ Created %d windows (%.1fs each)\n", len(windows), windowSize)
@@ -114,7 +113,7 @@ func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows,
 		fmt.Println("==> Timeline planning (cached)")
 		var timeline types.Timeline
 		if err := wd.ReadJSON("timeline.json", &timeline); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read timeline: %w", err)
 		}
 		return &timeline, nil
 	}
@@ -226,7 +225,7 @@ func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows,
 	timeline := &types.Timeline{Entries: entries}
 
 	if err := wd.WriteJSON("timeline.json", timeline); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write timeline: %w", err)
 	}
 
 	// Print stats
@@ -277,7 +276,7 @@ func selectImageForWindow(client *ollama.Client, cfg *config.Config, window Text
 
 	response, err := client.GenerateText(cfg.SelectModel, prompt, true)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate text: %w", err)
 	}
 
 	return parseSelectionResponse(response)

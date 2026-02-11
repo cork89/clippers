@@ -1,3 +1,4 @@
+// ./internal/pipeline/timeline.go
 package pipeline
 
 import (
@@ -16,7 +17,7 @@ func BuildTimeline(wd *workdir.WorkDir, cfg *config.Config, transcript *types.Tr
 		fmt.Println("==> Timeline (cached)")
 		var t types.Timeline
 		if err := wd.ReadJSON("timeline.json", &t); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read timeline: %w", err)
 		}
 		return &t, nil
 	}
@@ -60,7 +61,7 @@ func BuildTimeline(wd *workdir.WorkDir, cfg *config.Config, transcript *types.Tr
 	timeline := &types.Timeline{Entries: entries}
 
 	if err := wd.WriteJSON("timeline.json", timeline); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write timeline: %w", err)
 	}
 
 	fmt.Printf("  ✓ Created %d shots (%.1fs each)\n", len(entries), shotDuration)
