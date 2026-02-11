@@ -9,6 +9,7 @@ import (
 	"github.com/cork89/clippers/internal/config"
 	"github.com/cork89/clippers/internal/pipeline"
 	"github.com/cork89/clippers/internal/types"
+	"github.com/cork89/clippers/internal/webserver"
 	"github.com/cork89/clippers/internal/workdir"
 	"github.com/spf13/cobra"
 )
@@ -337,6 +338,65 @@ var shadersCmd = &cobra.Command{
 	},
 }
 
+var serverPort int
+var serverCmd = &cobra.Command{
+	Use:   "server",
+	Short: "Start the web UI server",
+	Long:  "Start a local web server for the interactive timeline editor",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if cfg.AudioPath == "" {
+			return fmt.Errorf("--audio is required")
+		}
+		if cfg.ImagesDir == "" {
+			return fmt.Errorf("--images is required")
+		}
+
+		wd, err := workdir.New(cfg)
+		if err != nil {
+			return err
+		}
+
+		// Check if project exists, if not run preflight and plan
+		if !wd.Exists("timeline.json") {
+			fmt.Println("No existing timeline found. Running planning stage first...")
+
+			if err := pipeline.Preflight(cfg, wd); err != nil {
+				return err
+			}
+
+			if _, err := pipeline.NormalizeAudio(wd, cfg.AudioPath, cfg.Force); err != nil {
+				return err
+			}
+
+			transcript, err := pipeline.Transcribe(wd, cfg, cfg.Force)
+			if err != nil {
+				return err
+			}
+
+			catalog, err := pipeline.CaptionImages(wd, cfg, cfg.Force)
+			if err != nil {
+				return err
+			}
+
+			windows, err := pipeline.BuildTextWindows(wd, cfg, transcript, cfg.Force)
+			if err != nil {
+				return err
+			}
+
+			_, err = pipeline.PlanTimeline(wd, cfg, windows, catalog, cfg.Force)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("Timeline created successfully!\n\n")
+		}
+
+		// Start the web server
+		server := webserver.NewServer(cfg, wd, serverPort)
+		return server.Start()
+	},
+}
+
 func shaderDescription(s config.ShaderType) string {
 	switch s {
 	case config.ShaderNone:
@@ -411,6 +471,15 @@ func init() {
 	planCmd.Flags().Float64Var(&cfg.DefaultImageWeight, "default-threshold", 0.5, "Confidence threshold for default image")
 	planCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
 
+	// Server command flags
+	serverCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
+	serverCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
+	serverCmd.Flags().StringVarP(&cfg.Title, "title", "t", "", "Video title")
+	serverCmd.Flags().IntVarP(&serverPort, "port", "p", 8080, "Server port")
+	serverCmd.Flags().Float64Var(&cfg.MinShotSec, "min-shot", 5, "Minimum shot duration in seconds")
+	serverCmd.Flags().Float64Var(&cfg.DefaultImageWeight, "default-threshold", 0.5, "Confidence threshold for default image")
+	serverCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
+
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(captionCmd)
 	rootCmd.AddCommand(transcribeCmd)
@@ -418,6 +487,7 @@ func init() {
 	rootCmd.AddCommand(renderCmd)
 	rootCmd.AddCommand(planCmd)
 	rootCmd.AddCommand(shadersCmd)
+	rootCmd.AddCommand(serverCmd)
 }
 
 func Execute() error {

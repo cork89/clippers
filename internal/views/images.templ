@@ -1,0 +1,58 @@
+// ./internal/views/images.templ
+package views
+
+import (
+	"fmt"
+	"github.com/cork89/clippers/internal/pipeline"
+)
+
+// ImagesData holds the data for rendering the image catalog
+type ImagesData struct {
+	Images  []pipeline.ImageCaption
+	Filter  string
+}
+
+// ImageCatalog renders the image browser
+templ ImageCatalog(data ImagesData) {
+	<div class="images-grid" id="images-grid">
+		for _, img := range data.Images {
+			@ImageCard(img)
+		}
+	</div>
+}
+
+// ImageCard renders a single image card
+templ ImageCard(img pipeline.ImageCaption) {
+	<div 
+		class="image-card"
+		data-image-id={ img.ID }
+		hx-post={ fmt.Sprintf("/api/segment/current/image?image_id=%s", img.ID) }
+		hx-target="#editor-panel-content"
+		hx-swap="innerHTML"
+		hx-trigger="click"
+		hx-vals={ fmt.Sprintf(`{"image_id": "%s"}`, img.ID) }
+	>
+		<img 
+			src={ fmt.Sprintf("/api/image/%s", img.ID) } 
+			alt={ img.Caption }
+			onerror="this.style.display='none'"
+		/>
+		<div class="caption">{ img.Caption }</div>
+		if len(img.Tags) > 0 {
+			<div class="tags">
+				for i, tag := range img.Tags {
+					if i < 3 {
+						<span class="tag">{ tag }</span>
+					}
+				}
+			</div>
+		}
+	</div>
+}
+
+// EmptyImages renders when no images exist
+templ EmptyImages() {
+	<div class="loading">
+		<p>No images found.</p>
+	</div>
+}

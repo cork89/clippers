@@ -1,0 +1,98 @@
+// ./internal/views/segment.templ
+package views
+
+import (
+	"fmt"
+	"github.com/cork89/clippers/internal/types"
+)
+
+// SegmentData holds data for rendering the segment editor
+type SegmentData struct {
+	Index      int
+	Entry      types.TimelineEntry
+	Transcript string
+}
+
+// SegmentEditor renders the segment editor panel
+templ SegmentEditor(data SegmentData) {
+	{{ 
+		duration := data.Entry.End - data.Entry.Start
+		confidence := data.Entry.Confidence
+		confidenceClass := "confidence-high"
+		if confidence < 0.5 {
+			confidenceClass = "confidence-low"
+		} else if confidence < 0.7 {
+			confidenceClass = "confidence-medium"
+		}
+	}}
+	
+	<div id="editor-panel-content">
+		<div class="segment-preview">
+			<img 
+				src={ fmt.Sprintf("/api/image/%s", data.Entry.ImageID) } 
+				alt={ data.Entry.ImageID }
+				onerror="this.src='/static/placeholder.svg'"
+			/>
+		</div>
+		
+		<div class="segment-info">
+			<div class="label">Time Range</div>
+			<div class="value">
+				{ fmt.Sprintf("%.3fs - %.3fs (%.1fs)", data.Entry.Start, data.Entry.End, duration) }
+			</div>
+		</div>
+		
+		<div class="segment-info">
+			<div class="label">Current Image</div>
+			<div class="value">{ data.Entry.ImageID }</div>
+		</div>
+		
+		<div class="segment-info">
+			<div class="label">Confidence</div>
+			<div class={ "value", confidenceClass }>
+				{ fmt.Sprintf("%.0f%%", confidence*100) }
+			</div>
+		</div>
+		
+		if data.Entry.Reason != "" {
+			<div class="segment-info">
+				<div class="label">Selection Reason</div>
+				<div class="transcript-text">{ data.Entry.Reason }</div>
+			</div>
+		}
+		
+		if data.Transcript != "" {
+			<div class="segment-info">
+				<div class="label">Audio Content</div>
+				<div class="transcript-text">{ data.Transcript }</div>
+			</div>
+		}
+		
+		<div class="segment-actions">
+			<button 
+				class="btn btn-primary"
+				hx-post={ fmt.Sprintf("/api/segment/%d/split", data.Index) }
+				hx-target="#timeline-container"
+				hx-swap="innerHTML"
+			>
+				➗ Split at Midpoint
+			</button>
+			<button 
+				class="btn btn-secondary"
+				hx-post={ fmt.Sprintf("/api/segment/%d/merge", data.Index) }
+				hx-target="#timeline-container"
+				hx-swap="innerHTML"
+				hx-confirm="Are you sure you want to merge with the next segment?"
+			>
+				➕ Merge with Next
+			</button>
+		</div>
+	</div>
+}
+
+// EmptySegmentEditor renders when no segment is selected
+templ EmptySegmentEditor() {
+	<div id="editor-panel-content">
+		<p class="empty-state">Click a segment in the timeline to edit</p>
+	</div>
+}

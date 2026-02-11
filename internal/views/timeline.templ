@@ -1,0 +1,70 @@
+// ./internal/views/timeline.templ
+package views
+
+import (
+	"fmt"
+	"github.com/cork89/clippers/internal/types"
+)
+
+// TimelineData holds the data needed to render the timeline
+type TimelineData struct {
+	Timeline     types.Timeline
+	DefaultName  string
+}
+
+// TimelineGrid renders the timeline as a grid of segments
+templ TimelineGrid(data TimelineData) {
+	<div class="timeline-grid" id="timeline-grid">
+		for i, entry := range data.Timeline.Entries {
+			@TimelineCell(i, entry, data.DefaultName)
+		}
+	</div>
+}
+
+// TimelineCell renders a single timeline cell
+templ TimelineCell(index int, entry types.TimelineEntry, defaultName string) {
+	{{ 
+		isDefault := entry.ImageID == defaultName
+		confidence := entry.Confidence
+		confidenceClass := "confidence-high"
+		if confidence < 0.5 {
+			confidenceClass = "confidence-low"
+		} else if confidence < 0.7 {
+			confidenceClass = "confidence-medium"
+		}
+	}}
+	
+	<div 
+		class={ "timeline-cell", templ.KV("default-image", isDefault) }
+		data-index={ fmt.Sprintf("%d", index) }
+		hx-get={ fmt.Sprintf("/api/segment/%d", index) }
+		hx-target="#editor-panel-content"
+		hx-swap="innerHTML"
+		hx-on::click="document.querySelectorAll('.timeline-cell').forEach(c => c.classList.remove('selected')); this.classList.add('selected');"
+	>
+		<div class="time-range">
+			{ fmt.Sprintf("%.1fs - %.1fs", entry.Start, entry.End) }
+		</div>
+		<div class="thumbnail">
+			<img 
+				src={ fmt.Sprintf("/api/image/%s", entry.ImageID) } 
+				alt={ entry.ImageID }
+				onerror="this.src='/static/placeholder.svg'"
+			/>
+		</div>
+		<div class="image-id">{ entry.ImageID }</div>
+		<div class={ "confidence", confidenceClass }>
+			{ fmt.Sprintf("%.0f%% confidence", confidence*100) }
+		</div>
+	</div>
+}
+
+// EmptyTimeline renders when no timeline exists
+templ EmptyTimeline() {
+	<div class="loading">
+		<p>No timeline found. Run the planning stage first.</p>
+		<button class="btn btn-primary" hx-post="/api/plan" hx-target="#timeline-container">
+			Create Timeline
+		</button>
+	</div>
+}
