@@ -1,6 +1,7 @@
 // ./internal/views/static/app.js
 
 // Filter images based on search input
+let currentAudioTimeout = undefined;
 function filterImages(query) {
   const cards = document.querySelectorAll('.image-card');
   const searchLower = query.toLowerCase();
@@ -13,6 +14,45 @@ function filterImages(query) {
     card.style.display = matches ? 'block' : 'none';
   });
 }
+
+// Audio playback functions
+if (typeof segmentEndTime === 'undefined') {
+  var segmentEndTime = null;
+}
+
+function playSegment() {
+  clearTimeout(currentAudioTimeout)
+  const audio = document.getElementById('global-audio');
+  const startInput = document.getElementById('segment-start');
+  const endInput = document.getElementById('segment-end');
+  
+  if (!audio || !startInput || !endInput) return;
+  
+  const startTime = parseFloat(startInput.value);
+  const endTime = parseFloat(endInput.value);
+  
+  if (isNaN(startTime) || isNaN(endTime)) return;
+  
+  audio.currentTime = startTime;
+  audio.play();
+  currentAudioTimeout = setTimeout(() => {
+    audio.pause()
+  }, (endTime-startTime)*1000)
+}
+
+// Show audio player when page loads
+document.addEventListener('DOMContentLoaded', () => {
+  const audio = document.getElementById('global-audio');
+  if (audio) {
+    // Check if audio source loads successfully
+    audio.addEventListener('loadeddata', () => {
+      audio.style.display = 'inline-block';
+    });
+    audio.addEventListener('error', () => {
+      console.log('Audio not available for this project');
+    });
+  }
+});
 
 // Handle save button
 document.addEventListener('htmx:afterRequest', (event) => {
@@ -29,6 +69,50 @@ document.addEventListener('htmx:afterRequest', (event) => {
   if (event.detail.target.id === 'render-btn' || event.detail.requestConfig?.path === '/api/render') {
     if (event.detail.successful) {
       document.getElementById('progress-modal').classList.remove('hidden');
+    }
+  }
+
+  // Handle image selection - update timeline cell
+  if (event.detail.requestConfig?.path?.includes('/api/segment/current/image')) {
+    if (event.detail.successful) {
+      const timelineCell = document.querySelector('.timeline-cell.selected');
+      if (timelineCell) {
+        timelineCell.classList.add('modified');
+        const index = timelineCell.dataset.index;
+        const editorContent = event.detail.target.closest('#editor-panel-content');
+        if (editorContent) {
+          const newImg = editorContent.querySelector('.segment-preview img');
+          if (newImg) {
+            const timelineImg = timelineCell.querySelector('.thumbnail img');
+            if (timelineImg) {
+              timelineImg.src = newImg.src;
+            }
+            const imageId = timelineCell.querySelector('.image-id');
+            if (imageId) {
+              const imgIdMatch = newImg.src.match(/\/api\/image\/([^?]+)/);
+              if (imgIdMatch) {
+                imageId.textContent = imgIdMatch[1];
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Handle timeline cell selection - update visual state
+  if (event.detail.requestConfig?.path?.match(/\/api\/segment\/\d+$/)) {
+    if (event.detail.successful) {
+      document.querySelectorAll('.timeline-cell').forEach(cell => {
+        cell.classList.remove('selected');
+      });
+      const index = event.detail.requestConfig.path.match(/\/api\/segment\/(\d+)/);
+      if (index) {
+        const cell = document.querySelector(`.timeline-cell[data-index="${index[1]}"]`);
+        if (cell) {
+          cell.classList.add('selected');
+        }
+      }
     }
   }
 });
@@ -105,9 +189,11 @@ function showNotification(message, type = 'info') {
   }, 3000);
 }
 
-// Add animation styles
+// Add animation styles (guard against multiple inclusions)
 const style = document.createElement('style');
-style.textContent = `
+if (!document.getElementById('clippers-animations')) {
+  style.id = 'clippers-animations';
+  style.textContent = `
   @keyframes slideIn {
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
@@ -117,7 +203,8 @@ style.textContent = `
     to { transform: translateX(100%); opacity: 0; }
   }
 `;
-document.head.appendChild(style);
+  document.head.appendChild(style);
+}
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {

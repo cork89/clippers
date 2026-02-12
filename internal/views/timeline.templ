@@ -8,9 +8,9 @@ import (
 
 // TimelineData holds the data needed to render the timeline
 type TimelineData struct {
-	Timeline     types.Timeline
-	DefaultName  string
-	ProjectName  string
+	Timeline    types.Timeline
+	DefaultName string
+	ProjectName string
 }
 
 // TimelineGrid renders the timeline as a grid of segments
@@ -24,7 +24,7 @@ templ TimelineGrid(data TimelineData) {
 
 // TimelineCell renders a single timeline cell
 templ TimelineCell(index int, entry types.TimelineEntry, defaultName string, projectName string) {
-	{{ 
+	{{
 		isDefault := entry.ImageID == defaultName
 		confidence := entry.Confidence
 		confidenceClass := "confidence-high"
@@ -34,8 +34,7 @@ templ TimelineCell(index int, entry types.TimelineEntry, defaultName string, pro
 			confidenceClass = "confidence-medium"
 		}
 	}}
-	
-	<div 
+	<div
 		class={ "timeline-cell", templ.KV("default-image", isDefault) }
 		data-index={ fmt.Sprintf("%d", index) }
 		hx-get={ fmt.Sprintf("/api/segment/%d", index) }
@@ -47,13 +46,12 @@ templ TimelineCell(index int, entry types.TimelineEntry, defaultName string, pro
 			{ fmt.Sprintf("%.1fs - %.1fs", entry.Start, entry.End) }
 		</div>
 		<div class="thumbnail">
-			<img 
-				src={ fmt.Sprintf("/api/image/%s?project=%s", entry.ImageID, projectName) } 
+			<img
+				src={ fmt.Sprintf("/api/image/%s?project=%s", entry.ImageID, projectName) }
 				alt={ entry.ImageID }
 				onerror="this.src='/static/placeholder.svg'"
 			/>
 		</div>
-		<div class="image-id">{ entry.ImageID }</div>
 		<div class={ "confidence", confidenceClass }>
 			{ fmt.Sprintf("%.0f%% confidence", confidence*100) }
 		</div>

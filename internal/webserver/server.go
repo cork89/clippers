@@ -84,6 +84,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/api/transcript", s.handleTranscript)
 	s.mux.HandleFunc("/api/segment/", s.handleSegment)
 	s.mux.HandleFunc("/api/image/", s.handleImage)
+	s.mux.HandleFunc("/api/audio", s.handleAudio)
 	s.mux.HandleFunc("/api/render", s.handleRender)
 	s.mux.HandleFunc("/api/timeline/html", s.handleTimelineHTML)
 	s.mux.HandleFunc("/api/images/html", s.handleImagesHTML)
@@ -664,6 +665,45 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeFile(w, r, imagePath)
+}
+
+func (s *Server) handleAudio(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	projectName := r.URL.Query().Get("project")
+
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
+	if projectName != "" {
+		w.Header().Set("Cache-Control", fmt.Sprintf("no-cache, no-store, must-revalidate, private; query=%s", projectName))
+	}
+
+	if s.config.AudioPath == "" {
+		log.Printf("Audio endpoint called but no AudioPath configured (project: %s)", projectName)
+		http.Error(w, "No audio file", http.StatusNotFound)
+		return
+	}
+
+	audioPath := s.config.AudioPath
+	if !strings.HasPrefix(audioPath, s.projectsDir) && !strings.HasPrefix(audioPath, ".") && !filepath.IsAbs(audioPath) {
+		absAudioPath, err := filepath.Abs(audioPath)
+		if err != nil {
+			log.Printf("Failed to get absolute path for audio: %v", err)
+			http.Error(w, "Invalid audio path", http.StatusBadRequest)
+			return
+		}
+		audioPath = absAudioPath
+	}
+
+	log.Printf("Serving audio from: %s (project: %s)", audioPath, projectName)
+
+	w.Header().Set("Content-Type", "audio/mpeg")
+	http.ServeFile(w, r, audioPath)
 }
 
 func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {

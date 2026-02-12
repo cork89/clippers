@@ -28,6 +28,8 @@ templ SegmentEditor(data SegmentData) {
 	}}
 	
 	<div id="editor-panel-content">
+		<input type="hidden" id="segment-start" value={ fmt.Sprintf("%.3f", data.Entry.Start) }/>
+		<input type="hidden" id="segment-end" value={ fmt.Sprintf("%.3f", data.Entry.End) }/>
 		<div class="segment-preview">
 			<img 
 				src={ fmt.Sprintf("/api/image/%s?project=%s", data.Entry.ImageID, data.ProjectName) } 
@@ -70,6 +72,12 @@ templ SegmentEditor(data SegmentData) {
 		}
 		
 		<div class="segment-actions">
+			<button 
+				class="btn btn-secondary"
+				onclick="playSegment()"
+			>
+				▶ Play Segment
+			</button>
 			<button 
 				class="btn btn-primary"
 				hx-post={ fmt.Sprintf("/api/segment/%d/split", data.Index) }
