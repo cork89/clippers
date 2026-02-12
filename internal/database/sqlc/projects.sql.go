@@ -77,3 +77,26 @@ func (q *Queries) ProjectExists(ctx context.Context, id string) (int64, error) {
 	err := row.Scan(&column_1)
 	return column_1, err
 }
+
+const updateProject = `-- name: UpdateProject :exec
+UPDATE projects SET audio_path = ?, images_dir = ?, output_dir = ?, settings = ? WHERE id = ?
+`
+
+type UpdateProjectParams struct {
+	AudioPath string         `json:"audio_path"`
+	ImagesDir string         `json:"images_dir"`
+	OutputDir string         `json:"output_dir"`
+	Settings  sql.NullString `json:"settings"`
+	ID        string         `json:"id"`
+}
+
+func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) error {
+	_, err := q.db.ExecContext(ctx, updateProject,
+		arg.AudioPath,
+		arg.ImagesDir,
+		arg.OutputDir,
+		arg.Settings,
+		arg.ID,
+	)
+	return err
+}

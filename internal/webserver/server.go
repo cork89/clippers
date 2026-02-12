@@ -2,6 +2,7 @@ package webserver
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/cork89/clippers/internal/config"
 	"github.com/cork89/clippers/internal/database"
+	"github.com/cork89/clippers/internal/database/sqlc"
 	"github.com/cork89/clippers/internal/pipeline"
 	"github.com/cork89/clippers/internal/types"
 	"github.com/cork89/clippers/internal/views"
@@ -74,6 +76,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/projects/", s.handleProjectPage)
 	s.mux.HandleFunc("/api/projects", s.handleProjectsList)
 	s.mux.HandleFunc("/api/project", s.handleProject)
+	s.mux.HandleFunc("/api/save", s.handleSave)
 	s.mux.HandleFunc("/api/process", s.handleProcess)
 	s.mux.HandleFunc("/api/process/status", s.handleProcessStatus)
 	s.mux.HandleFunc("/api/timeline", s.handleTimeline)
@@ -259,6 +262,63 @@ func (s *Server) handleProject(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(project); err != nil {
 		log.Printf("Error encoding project: %v", err)
+	}
+}
+
+func (s *Server) handleSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
+	project, err := s.db.Queries.GetProject(r.Context(), s.workDir.ProjectID())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get project: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	var updates types.Project
+	if err := json.NewDecoder(r.Body).Decode(&updates); err == nil && updates.Settings != nil {
+		settingsJSON, _ := json.Marshal(updates.Settings)
+		project.Settings = sql.NullString{
+			String: string(settingsJSON),
+			Valid:  len(settingsJSON) > 0,
+		}
+		if updates.AudioPath != "" {
+			project.AudioPath = updates.AudioPath
+		}
+		if updates.ImagesDir != "" {
+			project.ImagesDir = updates.ImagesDir
+		}
+		if updates.OutputDir != "" {
+			project.OutputDir = updates.OutputDir
+		}
+	}
+
+	settingsJSON, _ := json.Marshal(project.Settings)
+	err = s.db.Queries.UpdateProject(r.Context(), sqlc.UpdateProjectParams{
+		AudioPath: project.AudioPath,
+		ImagesDir: project.ImagesDir,
+		OutputDir: project.OutputDir,
+		Settings: sql.NullString{
+			String: string(settingsJSON),
+			Valid:  len(settingsJSON) > 0,
+		},
+		ID: s.workDir.ProjectID(),
+	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to save project: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "saved"}); err != nil {
+		log.Printf("Error encoding response: %v", err)
 	}
 }
 
