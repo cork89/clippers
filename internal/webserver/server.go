@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -32,6 +33,14 @@ type Server struct {
 	projectsDir         string
 	currentProject      string
 	currentSegmentIndex int
+	processingProgress  struct {
+		currentStage int
+		failedStage  int
+		failedError  string
+		isComplete   bool
+		isFailed     bool
+	}
+	processingMu sync.Mutex
 }
 
 func NewServer(cfg *config.Config, workDir *workdir.WorkDir, db *database.DB, port int, projectsDir string) *Server {
@@ -66,6 +75,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/api/projects", s.handleProjectsList)
 	s.mux.HandleFunc("/api/project", s.handleProject)
 	s.mux.HandleFunc("/api/process", s.handleProcess)
+	s.mux.HandleFunc("/api/process/status", s.handleProcessStatus)
 	s.mux.HandleFunc("/api/timeline", s.handleTimeline)
 	s.mux.HandleFunc("/api/images", s.handleImagesAPI)
 	s.mux.HandleFunc("/api/transcript", s.handleTranscript)
@@ -738,12 +748,20 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
 		projectName = s.currentProject
 	}
 
+	s.processingMu.Lock()
+	s.processingProgress.currentStage = -1
+	s.processingProgress.failedStage = -1
+	s.processingProgress.failedError = ""
+	s.processingProgress.isComplete = false
+	s.processingProgress.isFailed = false
+	s.processingMu.Unlock()
+
 	if s.workDir == nil || s.currentProject != projectName {
 		projectPath := filepath.Join(s.projectsDir, projectName)
 
 		projects, err := DiscoverProjects(s.projectsDir)
 		if err != nil {
-			component := views.ProcessingError(fmt.Sprintf("Failed to list projects: %v", err), projectName)
+			component := views.ProcessingErrorUI(fmt.Sprintf("Failed to list projects: %v", err), projectName)
 			if err := component.Render(r.Context(), w); err != nil {
 				log.Printf("Error rendering error: %v", err)
 			}
@@ -759,7 +777,7 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if foundProject == nil {
-			component := views.ProcessingError("Project not found", projectName)
+			component := views.ProcessingErrorUI("Project not found", projectName)
 			if err := component.Render(r.Context(), w); err != nil {
 				log.Printf("Error rendering error: %v", err)
 			}
@@ -772,22 +790,13 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
 
 		wd, err := workdir.New(r.Context(), s.config, s.db)
 		if err != nil {
-			component := views.ProcessingError(fmt.Sprintf("Failed to create work directory: %v", err), projectName)
+			component := views.ProcessingErrorUI(fmt.Sprintf("Failed to create work directory: %v", err), projectName)
 			if err := component.Render(r.Context(), w); err != nil {
 				log.Printf("Error rendering error: %v", err)
 			}
 			return
 		}
 		s.workDir = wd
-	}
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		component := views.ProcessingError("Streaming not supported", projectName)
-		if err := component.Render(r.Context(), w); err != nil {
-			log.Printf("Error rendering error: %v", err)
-		}
-		return
 	}
 
 	w.Header().Set("Content-Type", "text/html")
@@ -831,16 +840,19 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
 		}},
 	}
 
-	for i, stage := range stages {
-		percent := float64(i) / float64(len(stages))
-		component := views.ProcessingProgress(stage.name, stage.name+"...", percent)
-		if err := component.Render(r.Context(), w); err != nil {
-			log.Printf("Error rendering progress: %v", err)
-		}
-		flusher.Flush()
+	for i := range stages {
+		s.processingMu.Lock()
+		s.processingProgress.currentStage = i
+		s.processingMu.Unlock()
 
-		if err := stage.action(); err != nil {
-			component := views.ProcessingError(fmt.Sprintf("%s failed: %v", stage.name, err), projectName)
+		if err := stages[i].action(); err != nil {
+			s.processingMu.Lock()
+			s.processingProgress.failedStage = i
+			s.processingProgress.failedError = err.Error()
+			s.processingProgress.isFailed = true
+			s.processingMu.Unlock()
+
+			component := views.ProcessingErrorUI(fmt.Sprintf("%s failed: %v", stages[i].name, err), projectName)
 			if err := component.Render(r.Context(), w); err != nil {
 				log.Printf("Error rendering error: %v", err)
 			}
@@ -848,8 +860,46 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	component := views.ProcessingComplete(projectName)
+	s.processingMu.Lock()
+	s.processingProgress.currentStage = len(stages)
+	s.processingProgress.isComplete = true
+	s.processingMu.Unlock()
+
+	component := views.ProcessingCompleteUI(projectName)
 	if err := component.Render(r.Context(), w); err != nil {
 		log.Printf("Error rendering complete: %v", err)
+	}
+}
+
+func (s *Server) handleProcessStatus(w http.ResponseWriter, r *http.Request) {
+	s.processingMu.Lock()
+	defer s.processingMu.Unlock()
+
+	w.Header().Set("Content-Type", "text/html")
+
+	if s.processingProgress.isComplete {
+		component := views.ProcessingCompleteUI(s.currentProject)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Printf("Error rendering complete: %v", err)
+		}
+		return
+	}
+
+	if s.processingProgress.isFailed {
+		component := views.ProcessingErrorUI(s.processingProgress.failedError, s.currentProject)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Printf("Error rendering error: %v", err)
+		}
+		return
+	}
+
+	currentStage := s.processingProgress.currentStage
+	if currentStage < 0 {
+		currentStage = 0
+	}
+
+	component := views.ProcessingStages(currentStage, s.processingProgress.failedStage, s.processingProgress.failedError)
+	if err := component.Render(r.Context(), w); err != nil {
+		log.Printf("Error rendering stages: %v", err)
 	}
 }
