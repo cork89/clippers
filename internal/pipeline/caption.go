@@ -1,33 +1,17 @@
-// ./internal/pipeline/caption.go
 package pipeline
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/cork89/clippers/internal/config"
+	"github.com/cork89/clippers/internal/database"
 	"github.com/cork89/clippers/internal/ollama"
 	"github.com/cork89/clippers/internal/workdir"
 )
-
-// ImageCaption holds the caption data for a single image
-type ImageCaption struct {
-	ID        string   `json:"id"`
-	Path      string   `json:"path"`
-	Caption   string   `json:"caption"`
-	Tags      []string `json:"tags"`
-	Style     int      `json:"style"`
-	Notes     string   `json:"notes,omitempty"`
-	IsDefault bool     `json:"is_default,omitempty"`
-}
-
-// ImageCatalog holds all image captions
-type ImageCatalog struct {
-	Images       []ImageCaption `json:"images"`
-	DefaultImage string         `json:"default_image,omitempty"`
-}
 
 const captionPrompt = `Analyze this image and respond with ONLY valid JSON in this exact format:
 {
@@ -52,31 +36,27 @@ Analyze the image and output this exact JSON structure:
 
 ONLY JSON. Nothing else.`
 
-// CaptionImages generates captions for all images using Ollama vision model
-func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageCatalog, error) {
-	if !force && wd.Exists("images/captions.json") {
-		fmt.Println("==> Image captioning (cached)")
-		var catalog ImageCatalog
-		if err := wd.ReadJSON("images/captions.json", &catalog); err != nil {
-			return nil, fmt.Errorf("failed to read captions: %w", err)
+func CaptionImages(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, db *database.DB, force bool) (*database.ImageCatalog, error) {
+	if !force {
+		exists, _ := db.Queries.ImageCatalogExists(ctx, wd.ProjectID())
+		if exists == 1 {
+			fmt.Println("==> Image captioning (cached)")
+			return db.GetImageCatalog(ctx, wd.ProjectID())
 		}
-		return &catalog, nil
 	}
 
 	fmt.Println("==> Captioning images with", cfg.VisionModel)
 
 	client := ollama.NewClient(cfg.OllamaHost)
 
-	// Get list of images
 	images, err := listImages(cfg.ImagesDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list images: %w", err)
 	}
 
-	// Detect default image
 	defaultImagePath := DetectDefaultImage(cfg.ImagesDir)
 
-	var catalog ImageCatalog
+	var catalog database.ImageCatalog
 	catalog.DefaultImage = defaultImagePath
 
 	for i, imagePath := range images {
@@ -92,14 +72,6 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 		caption, err := captionImage(client, cfg.VisionModel, imagePath)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to caption image, %v", err)
-			// fmt.Printf("failed: %v\n", err)
-			// caption = &ImageCaption{
-			// 	ID:      imageID,
-			// 	Path:    imagePath,
-			// 	Caption: "An image",
-			// 	Tags:    []string{"image", "visual"},
-			// 	Style:   2,
-			// }
 		} else {
 			caption.ID = imageID
 			caption.Path = imagePath
@@ -108,7 +80,6 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 
 		caption.IsDefault = isDefault
 
-		// Add special tags for default image
 		if isDefault {
 			caption.Tags = append(caption.Tags, "default", "fallback", "generic")
 		}
@@ -116,7 +87,7 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 		catalog.Images = append(catalog.Images, *caption)
 	}
 
-	if err := wd.WriteJSON("images/captions.json", catalog); err != nil {
+	if err := db.SaveImageCatalog(ctx, wd.ProjectID(), &catalog); err != nil {
 		return nil, fmt.Errorf("failed to save captions: %w", err)
 	}
 
@@ -129,7 +100,7 @@ func CaptionImages(wd *workdir.WorkDir, cfg *config.Config, force bool) (*ImageC
 	return &catalog, nil
 }
 
-func captionImage(client *ollama.Client, model, imagePath string) (*ImageCaption, error) {
+func captionImage(client *ollama.Client, model, imagePath string) (*database.ImageCaption, error) {
 	response, err := client.GenerateWithImage(model, captionPrompt, imagePath, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate captions: %w", err)
@@ -151,14 +122,14 @@ func captionImage(client *ollama.Client, model, imagePath string) (*ImageCaption
 	return caption, nil
 }
 
-func parseCaptionResponse(response string) (*ImageCaption, error) {
+func parseCaptionResponse(response string) (*database.ImageCaption, error) {
 	response = strings.TrimSpace(response)
 	response = strings.TrimPrefix(response, "```json")
 	response = strings.TrimPrefix(response, "```")
 	response = strings.TrimSuffix(response, "```")
 	response = strings.TrimSpace(response)
 
-	var caption ImageCaption
+	var caption database.ImageCaption
 	if err := json.Unmarshal([]byte(response), &caption); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w (response: %s)", err, truncate(response, 200))
 	}

@@ -1,29 +1,27 @@
 package workdir
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
-	"time"
 
 	"github.com/cork89/clippers/internal/config"
-	"github.com/cork89/clippers/internal/types"
+	"github.com/cork89/clippers/internal/database"
 )
 
-// WorkDir manages the working directory for a project
 type WorkDir struct {
 	Root string
 	Hash string
 	cfg  *config.Config
+	db   *database.DB
 }
 
-// New creates or opens a work directory based on input hashes
-func New(cfg *config.Config) (*WorkDir, error) {
+func New(ctx context.Context, cfg *config.Config, db *database.DB) (*WorkDir, error) {
 	audioHash, err := hashFile(cfg.AudioPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash audio: %w", err)
@@ -34,7 +32,6 @@ func New(cfg *config.Config) (*WorkDir, error) {
 		return nil, fmt.Errorf("failed to hash images: %w", err)
 	}
 
-	// Combine hashes for unique work directory
 	combined := fmt.Sprintf("%s:%s:%.1f:%d", audioHash[:16], imagesHash[:16], cfg.MinShotSec, cfg.BlurStrength)
 	h := sha256.Sum256([]byte(combined))
 	hash := hex.EncodeToString(h[:])[:16]
@@ -44,68 +41,41 @@ func New(cfg *config.Config) (*WorkDir, error) {
 		return nil, fmt.Errorf("failed to create work directory: %w", err)
 	}
 
-	// Create subdirectories
-	for _, sub := range []string{"images", "text", "render"} {
-		if err := os.MkdirAll(filepath.Join(root, sub), 0755); err != nil {
-			return nil, fmt.Errorf("failed to make work directory: %w", err)
-		}
-	}
-
 	wd := &WorkDir{
 		Root: root,
 		Hash: hash,
 		cfg:  cfg,
+		db:   db,
 	}
 
-	// Write project.json
-	project := types.Project{
-		AudioPath:  cfg.AudioPath,
-		ImagesDir:  cfg.ImagesDir,
-		OutputDir:  cfg.OutputDir,
-		AudioHash:  audioHash,
-		ImagesHash: imagesHash,
-		Settings: map[string]string{
-			"min_shot_sec":  fmt.Sprintf("%.1f", cfg.MinShotSec),
-			"blur_strength": fmt.Sprintf("%d", cfg.BlurStrength),
-			"whisper_model": cfg.WhisperModel,
-		},
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	settings := map[string]string{
+		"min_shot_sec":  fmt.Sprintf("%.1f", cfg.MinShotSec),
+		"blur_strength": fmt.Sprintf("%d", cfg.BlurStrength),
+		"whisper_model": cfg.WhisperModel,
 	}
 
-	if err := wd.WriteJSON("project.json", project); err != nil {
-		return nil, fmt.Errorf("failed to write project: %w", err)
+	if err := db.CreateProject(ctx, hash, cfg.AudioPath, cfg.ImagesDir, cfg.OutputDir, audioHash, imagesHash, settings); err != nil {
+		return nil, fmt.Errorf("failed to create project in database: %w", err)
 	}
 
 	return wd, nil
 }
 
-// Path returns the full path to a file in the work directory
 func (w *WorkDir) Path(name string) string {
 	return filepath.Join(w.Root, name)
 }
 
-// Exists checks if a file exists in the work directory
 func (w *WorkDir) Exists(name string) bool {
 	_, err := os.Stat(w.Path(name))
 	return err == nil
 }
 
-// WriteJSON writes a JSON file to the work directory
-func (w *WorkDir) WriteJSON(name string, v any) error {
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(w.Path(name), data, 0644)
+func (w *WorkDir) DB() *database.DB {
+	return w.db
 }
 
-// ReadJSON reads a JSON file from the work directory
-func (w *WorkDir) ReadJSON(name string, v any) error {
-	data, err := os.ReadFile(w.Path(name))
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(data, v)
+func (w *WorkDir) ProjectID() string {
+	return w.Hash
 }
 
 func hashFile(path string) (string, error) {
@@ -163,8 +133,7 @@ func isImageFile(path string) bool {
 	}
 }
 
-// NewForImages creates a work directory for image-only operations
-func NewForImages(cfg *config.Config) (*WorkDir, error) {
+func NewForImages(ctx context.Context, cfg *config.Config, db *database.DB) (*WorkDir, error) {
 	imagesHash, err := hashDirectory(cfg.ImagesDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash images: %w", err)
@@ -179,15 +148,10 @@ func NewForImages(cfg *config.Config) (*WorkDir, error) {
 		return nil, fmt.Errorf("failed to create work directory: %w", err)
 	}
 
-	for _, sub := range []string{"images", "text", "render"} {
-		if err := os.MkdirAll(filepath.Join(root, sub), 0755); err != nil {
-			return nil, fmt.Errorf("failed to make work directory: %w", err)
-		}
-	}
-
 	return &WorkDir{
 		Root: root,
 		Hash: hash,
 		cfg:  cfg,
+		db:   db,
 	}, nil
 }

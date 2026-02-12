@@ -1,7 +1,7 @@
-// ./internal/pipeline/plan.go
 package pipeline
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,24 +9,12 @@ import (
 	"strings"
 
 	"github.com/cork89/clippers/internal/config"
+	"github.com/cork89/clippers/internal/database"
 	"github.com/cork89/clippers/internal/ollama"
 	"github.com/cork89/clippers/internal/types"
 	"github.com/cork89/clippers/internal/workdir"
 )
 
-// TextWindow represents a time window with its text content
-type TextWindow struct {
-	Start float64 `json:"start"`
-	End   float64 `json:"end"`
-	Text  string  `json:"text"`
-}
-
-// TextWindows holds all windows
-type TextWindows struct {
-	Windows []TextWindow `json:"windows"`
-}
-
-// SelectionResult is the LLM's response for image selection
 type SelectionResult struct {
 	ChosenImageID  string  `json:"chosen_image_id"`
 	BackupImageID  string  `json:"backup_image_id"`
@@ -36,15 +24,13 @@ type SelectionResult struct {
 	MatchesSegment bool    `json:"matches_segment"`
 }
 
-// BuildTextWindows creates fixed-duration windows with overlapping text
-func BuildTextWindows(wd *workdir.WorkDir, cfg *config.Config, transcript *types.Transcript, force bool) (*TextWindows, error) {
-	if !force && wd.Exists("text/windows.json") {
-		fmt.Println("==> Text windows (cached)")
-		var windows TextWindows
-		if err := wd.ReadJSON("text/windows.json", &windows); err != nil {
-			return nil, fmt.Errorf("failed to read windows: %w", err)
+func BuildTextWindows(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, db *database.DB, transcript *types.Transcript, force bool) ([]database.TextWindowData, error) {
+	if !force {
+		exists, _ := db.Queries.WindowsExist(ctx, wd.ProjectID())
+		if exists == 1 {
+			fmt.Println("==> Text windows (cached)")
+			return db.GetTextWindows(ctx, wd.ProjectID())
 		}
-		return &windows, nil
 	}
 
 	fmt.Println("==> Building text windows")
@@ -52,7 +38,7 @@ func BuildTextWindows(wd *workdir.WorkDir, cfg *config.Config, transcript *types
 	duration := transcript.DurationSec
 	windowSize := cfg.MinShotSec
 
-	var windows []TextWindow
+	var windows []database.TextWindowData
 	currentTime := 0.0
 
 	for currentTime < duration {
@@ -68,7 +54,7 @@ func BuildTextWindows(wd *workdir.WorkDir, cfg *config.Config, transcript *types
 			}
 		}
 
-		windows = append(windows, TextWindow{
+		windows = append(windows, database.TextWindowData{
 			Start: currentTime,
 			End:   end,
 			Text:  strings.Join(texts, " "),
@@ -77,17 +63,14 @@ func BuildTextWindows(wd *workdir.WorkDir, cfg *config.Config, transcript *types
 		currentTime = end
 	}
 
-	result := &TextWindows{Windows: windows}
-
-	if err := wd.WriteJSON("text/windows.json", result); err != nil {
+	if err := db.SaveTextWindows(ctx, wd.ProjectID(), windows); err != nil {
 		return nil, fmt.Errorf("failed to save windows: %w", err)
 	}
 
 	fmt.Printf("  ✓ Created %d windows (%.1fs each)\n", len(windows), windowSize)
-	return result, nil
+	return windows, nil
 }
 
-// DetectDefaultImage checks if default.png exists in the images directory
 func DetectDefaultImage(imagesDir string) string {
 	candidates := []string{
 		"default.png",
@@ -107,45 +90,39 @@ func DetectDefaultImage(imagesDir string) string {
 	return ""
 }
 
-// PlanTimeline uses LLM to select images for each window
-func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows, catalog *ImageCatalog, force bool) (*types.Timeline, error) {
-	if !force && wd.Exists("timeline.json") {
-		fmt.Println("==> Timeline planning (cached)")
-		var timeline types.Timeline
-		if err := wd.ReadJSON("timeline.json", &timeline); err != nil {
-			return nil, fmt.Errorf("failed to read timeline: %w", err)
+func PlanTimeline(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, db *database.DB, windows []database.TextWindowData, catalog *database.ImageCatalog, force bool) (*types.Timeline, error) {
+	if !force {
+		exists, _ := db.Queries.TimelineExists(ctx, wd.ProjectID())
+		if exists == 1 {
+			fmt.Println("==> Timeline planning (cached)")
+			return db.GetTimeline(ctx, wd.ProjectID())
 		}
-		return &timeline, nil
 	}
 
 	fmt.Println("==> Planning timeline with", cfg.SelectModel)
 
-	// Check for default image
 	defaultImagePath := DetectDefaultImage(cfg.ImagesDir)
 	hasDefault := defaultImagePath != ""
 	if hasDefault {
 		fmt.Printf("  ✓ Found default image: %s\n", filepath.Base(defaultImagePath))
 	}
 
-	// Show title if provided
 	if cfg.Title != "" {
 		fmt.Printf("  ✓ Using title context: %q\n", cfg.Title)
 	}
 
 	client := ollama.NewClient(cfg.OllamaHost)
 
-	// Build image catalog summary (excluding default from regular selection)
 	catalogSummary := buildCatalogSummaryWithTitle(catalog, cfg.Title, hasDefault)
 
 	var entries []types.TimelineEntry
 	previousImageID := ""
 
-	// Track usage stats
 	defaultUsageCount := 0
 	titleMatchCount := 0
 
-	for i, window := range windows.Windows {
-		fmt.Printf("  [%d/%d] %.1fs-%.1fs... ", i+1, len(windows.Windows), window.Start, window.End)
+	for i, window := range windows {
+		fmt.Printf("  [%d/%d] %.1fs-%.1fs... ", i+1, len(windows), window.Start, window.End)
 
 		selection, err := selectImageForWindow(client, cfg, window, catalogSummary, previousImageID, hasDefault)
 		if err != nil {
@@ -157,17 +134,11 @@ func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows,
 			}
 		}
 
-		// Apply default image logic
 		chosenID := selection.ChosenImageID
 		imagePath := ""
 
-		// Check if we should use default image
 		useDefault := false
 		if hasDefault {
-			// Use default if:
-			// 1. Confidence is below threshold
-			// 2. LLM explicitly chose default
-			// 3. Chosen image doesn't exist
 			if selection.Confidence < cfg.DefaultImageWeight {
 				useDefault = true
 			}
@@ -182,15 +153,12 @@ func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows,
 			defaultUsageCount++
 			fmt.Printf("→ default (conf: %.2f)\n", selection.Confidence)
 		} else {
-			// Avoid immediate repeats if possible
 			if chosenID == previousImageID && selection.BackupImageID != "" && selection.BackupImageID != previousImageID {
 				chosenID = selection.BackupImageID
 			}
 
-			// Verify the chosen image exists
 			imagePath = findImagePath(catalog, chosenID)
 			if imagePath == "" {
-				// Fallback to default if available, otherwise first image
 				if hasDefault {
 					chosenID = filepath.Base(defaultImagePath)
 					imagePath = defaultImagePath
@@ -219,16 +187,14 @@ func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows,
 		previousImageID = chosenID
 	}
 
-	// Apply smoothing pass
 	entries = smoothTimeline(entries, catalog, defaultImagePath)
 
 	timeline := &types.Timeline{Entries: entries}
 
-	if err := wd.WriteJSON("timeline.json", timeline); err != nil {
+	if err := db.SaveTimeline(ctx, wd.ProjectID(), timeline); err != nil {
 		return nil, fmt.Errorf("failed to write timeline: %w", err)
 	}
 
-	// Print stats
 	fmt.Printf("  ✓ Planned %d shots\n", len(entries))
 	if hasDefault {
 		fmt.Printf("    Default image used: %d times (%.0f%%)\n",
@@ -242,7 +208,7 @@ func PlanTimeline(wd *workdir.WorkDir, cfg *config.Config, windows *TextWindows,
 	return timeline, nil
 }
 
-func buildCatalogSummaryWithTitle(catalog *ImageCatalog, title string, hasDefault bool) string {
+func buildCatalogSummaryWithTitle(catalog *database.ImageCatalog, title string, hasDefault bool) string {
 	var sb strings.Builder
 
 	if title != "" {
@@ -253,7 +219,6 @@ func buildCatalogSummaryWithTitle(catalog *ImageCatalog, title string, hasDefaul
 	sb.WriteString("Available images:\n")
 
 	for _, img := range catalog.Images {
-		// Skip default image in regular listing
 		if strings.HasPrefix(strings.ToLower(img.ID), "default.") {
 			continue
 		}
@@ -271,7 +236,7 @@ func buildCatalogSummaryWithTitle(catalog *ImageCatalog, title string, hasDefaul
 	return sb.String()
 }
 
-func selectImageForWindow(client *ollama.Client, cfg *config.Config, window TextWindow, catalog, previousID string, hasDefault bool) (*SelectionResult, error) {
+func selectImageForWindow(client *ollama.Client, cfg *config.Config, window database.TextWindowData, catalog, previousID string, hasDefault bool) (*SelectionResult, error) {
 	prompt := buildSelectionPromptWithTitle(cfg, window, catalog, previousID, hasDefault)
 
 	response, err := client.GenerateText(cfg.SelectModel, prompt, true)
@@ -282,18 +247,16 @@ func selectImageForWindow(client *ollama.Client, cfg *config.Config, window Text
 	return parseSelectionResponse(response)
 }
 
-func buildSelectionPromptWithTitle(cfg *config.Config, window TextWindow, catalog, previousID string, hasDefault bool) string {
+func buildSelectionPromptWithTitle(cfg *config.Config, window database.TextWindowData, catalog, previousID string, hasDefault bool) string {
 	var sb strings.Builder
 
 	sb.WriteString("You are selecting images for a video. Choose the best image for this audio segment.\n\n")
 
-	// Title context (weighted heavily)
 	if cfg.Title != "" {
 		sb.WriteString(fmt.Sprintf("=== VIDEO TITLE (IMPORTANT) ===\n%q\n", cfg.Title))
 		sb.WriteString("Images matching the title's theme should be STRONGLY preferred.\n\n")
 	}
 
-	// Audio segment
 	sb.WriteString(fmt.Sprintf("=== AUDIO SEGMENT (%.1fs to %.1fs) ===\n", window.Start, window.End))
 	if window.Text != "" {
 		sb.WriteString(fmt.Sprintf("%q\n\n", window.Text))
@@ -301,17 +264,14 @@ func buildSelectionPromptWithTitle(cfg *config.Config, window TextWindow, catalo
 		sb.WriteString("[No speech in this segment]\n\n")
 	}
 
-	// Image catalog
 	sb.WriteString("=== AVAILABLE IMAGES ===\n")
 	sb.WriteString(catalog)
 	sb.WriteString("\n")
 
-	// Previous image context
 	if previousID != "" {
 		sb.WriteString(fmt.Sprintf("Previous shot used: %s (avoid immediate repeat unless best match)\n\n", previousID))
 	}
 
-	// Selection criteria
 	sb.WriteString("=== SELECTION CRITERIA ===\n")
 	sb.WriteString("1. TITLE MATCH (highest priority): Does the image fit the video's overall title/theme?\n")
 	sb.WriteString("2. SEGMENT MATCH: Does the image match what's being said in this segment?\n")
@@ -323,7 +283,6 @@ func buildSelectionPromptWithTitle(cfg *config.Config, window TextWindow, catalo
 
 	sb.WriteString("\n")
 
-	// Output format
 	sb.WriteString(`Respond with ONLY valid JSON:
 {
   "chosen_image_id": "filename.jpg",
@@ -362,7 +321,6 @@ func parseSelectionResponse(response string) (*SelectionResult, error) {
 		return nil, fmt.Errorf("empty chosen_image_id")
 	}
 
-	// Clamp confidence to valid range
 	if result.Confidence < 0 {
 		result.Confidence = 0
 	}
@@ -373,7 +331,7 @@ func parseSelectionResponse(response string) (*SelectionResult, error) {
 	return &result, nil
 }
 
-func findImagePath(catalog *ImageCatalog, imageID string) string {
+func findImagePath(catalog *database.ImageCatalog, imageID string) string {
 	for _, img := range catalog.Images {
 		if img.ID == imageID {
 			return img.Path
@@ -382,26 +340,20 @@ func findImagePath(catalog *ImageCatalog, imageID string) string {
 	return ""
 }
 
-// smoothTimeline reduces rapid back-and-forth between images
-func smoothTimeline(entries []types.TimelineEntry, catalog *ImageCatalog, defaultImagePath string) []types.TimelineEntry {
+func smoothTimeline(entries []types.TimelineEntry, catalog *database.ImageCatalog, defaultImagePath string) []types.TimelineEntry {
 	if len(entries) < 3 {
 		return entries
 	}
 
-	// Detect A-B-A patterns and replace middle with A
-	// But don't smooth away from default if confidence was very low
 	for i := 1; i < len(entries)-1; i++ {
 		prev := entries[i-1].ImageID
 		curr := entries[i].ImageID
 		next := entries[i+1].ImageID
 
-		// Skip smoothing if current is default with very low confidence
-		// (it was chosen for a reason)
 		if defaultImagePath != "" && curr == filepath.Base(defaultImagePath) && entries[i].Confidence < 0.3 {
 			continue
 		}
 
-		// If we have A-B-A, change to A-A-A
 		if prev == next && curr != prev {
 			entries[i].ImageID = prev
 			entries[i].Image = entries[i-1].Image

@@ -1,13 +1,14 @@
-// ./internal/cli/root.go
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/cork89/clippers/internal/config"
+	"github.com/cork89/clippers/internal/database"
 	"github.com/cork89/clippers/internal/pipeline"
 	"github.com/cork89/clippers/internal/types"
 	"github.com/cork89/clippers/internal/webserver"
@@ -56,7 +57,13 @@ var runCmd = &cobra.Command{
 			cfg.Shader = config.ShaderType(shaderFlag)
 		}
 
-		return pipeline.Run(cfg)
+		db, err := database.Open(".clippers.db")
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
+
+		return pipeline.Run(context.Background(), cfg, db)
 	},
 }
 
@@ -71,12 +78,18 @@ var captionCmd = &cobra.Command{
 			cfg.AudioPath = "dummy"
 		}
 
-		wd, err := workdir.NewForImages(cfg)
+		db, err := database.Open(".clippers.db")
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
+
+		wd, err := workdir.NewForImages(context.Background(), cfg, db)
 		if err != nil {
 			return err
 		}
 
-		catalog, err := pipeline.CaptionImages(wd, cfg, cfg.Force)
+		catalog, err := pipeline.CaptionImages(context.Background(), wd, cfg, db, cfg.Force)
 		if err != nil {
 			return err
 		}
@@ -105,7 +118,13 @@ var transcribeCmd = &cobra.Command{
 			cfg.ImagesDir = "."
 		}
 
-		wd, err := workdir.New(cfg)
+		db, err := database.Open(".clippers.db")
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
+
+		wd, err := workdir.New(context.Background(), cfg, db)
 		if err != nil {
 			return err
 		}
@@ -114,7 +133,7 @@ var transcribeCmd = &cobra.Command{
 			return err
 		}
 
-		transcript, err := pipeline.Transcribe(wd, cfg, cfg.Force)
+		transcript, err := pipeline.Transcribe(context.Background(), wd, cfg, db, cfg.Force)
 		if err != nil {
 			return err
 		}
@@ -139,21 +158,27 @@ var previewCmd = &cobra.Command{
 			return fmt.Errorf("--images is required")
 		}
 
-		wd, err := workdir.New(cfg)
+		db, err := database.Open(".clippers.db")
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
+
+		wd, err := workdir.New(context.Background(), cfg, db)
 		if err != nil {
 			return err
 		}
 
-		if !wd.Exists("timeline.json") {
+		exists, _ := db.Queries.TimelineExists(context.Background(), wd.ProjectID())
+		if exists != 1 {
 			return fmt.Errorf("no timeline found. Run 'clippers run' first")
 		}
 
-		var timeline types.Timeline
-		if err := wd.ReadJSON("timeline.json", &timeline); err != nil {
+		timeline, err := db.GetTimeline(context.Background(), wd.ProjectID())
+		if err != nil {
 			return err
 		}
 
-		// Detect default image for highlighting
 		defaultImage := pipeline.DetectDefaultImage(cfg.ImagesDir)
 		defaultName := ""
 		if defaultImage != "" {
@@ -224,24 +249,30 @@ var renderCmd = &cobra.Command{
 			cfg.Shader = config.ShaderType(shaderFlag)
 		}
 
-		wd, err := workdir.New(cfg)
+		db, err := database.Open(".clippers.db")
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
+
+		wd, err := workdir.New(context.Background(), cfg, db)
 		if err != nil {
 			return err
 		}
 
-		if !wd.Exists("timeline.json") {
+		exists, _ := db.Queries.TimelineExists(context.Background(), wd.ProjectID())
+		if exists != 1 {
 			return fmt.Errorf("no timeline found. Run 'clippers run' first")
 		}
 		if !wd.Exists("audio.wav") {
 			return fmt.Errorf("no normalized audio found. Run 'clippers run' first")
 		}
 
-		var timeline types.Timeline
-		if err := wd.ReadJSON("timeline.json", &timeline); err != nil {
+		timeline, err := db.GetTimeline(context.Background(), wd.ProjectID())
+		if err != nil {
 			return err
 		}
 
-		// Prefer processed ASS, fall back to SRT
 		subtitleAspects := make([]types.SubtitleAspect, 0)
 
 		for _, aspect := range cfg.Aspects {
@@ -254,7 +285,7 @@ var renderCmd = &cobra.Command{
 			}
 		}
 
-		outputs, err := pipeline.RenderAll(wd, cfg, &timeline, subtitleAspects)
+		outputs, err := pipeline.RenderAll(wd, cfg, timeline, subtitleAspects)
 		if err != nil {
 			return err
 		}
@@ -279,40 +310,41 @@ var planCmd = &cobra.Command{
 			return fmt.Errorf("--images is required")
 		}
 
-		wd, err := workdir.New(cfg)
+		db, err := database.Open(".clippers.db")
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
+
+		wd, err := workdir.New(context.Background(), cfg, db)
 		if err != nil {
 			return err
 		}
 
-		// Run preflight for Ollama
 		if err := pipeline.Preflight(cfg, wd); err != nil {
 			return err
 		}
 
-		// Normalize and transcribe
 		if _, err := pipeline.NormalizeAudio(wd, cfg.AudioPath, cfg.Force); err != nil {
 			return err
 		}
 
-		transcript, err := pipeline.Transcribe(wd, cfg, cfg.Force)
+		transcript, err := pipeline.Transcribe(context.Background(), wd, cfg, db, cfg.Force)
 		if err != nil {
 			return err
 		}
 
-		// Caption images
-		catalog, err := pipeline.CaptionImages(wd, cfg, cfg.Force)
+		catalog, err := pipeline.CaptionImages(context.Background(), wd, cfg, db, cfg.Force)
 		if err != nil {
 			return err
 		}
 
-		// Build windows
-		windows, err := pipeline.BuildTextWindows(wd, cfg, transcript, cfg.Force)
+		windows, err := pipeline.BuildTextWindows(context.Background(), wd, cfg, db, transcript, cfg.Force)
 		if err != nil {
 			return err
 		}
 
-		// Plan timeline
-		timeline, err := pipeline.PlanTimeline(wd, cfg, windows, catalog, cfg.Force)
+		timeline, err := pipeline.PlanTimeline(context.Background(), wd, cfg, db, windows, catalog, cfg.Force)
 		if err != nil {
 			return err
 		}
@@ -341,20 +373,25 @@ var shadersCmd = &cobra.Command{
 
 var serverPort int
 var projectsDir string
+
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Start the web UI server",
 	Long:  "Start a local web server for the interactive timeline editor. If --audio and --images are not provided, shows a project selector using --projects-dir.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// If projects directory is specified or audio/images not provided, use project selector mode
 		useProjectSelector := projectsDir != "" || (cfg.AudioPath == "" && cfg.ImagesDir == "")
+
+		db, err := database.Open(".clippers.db")
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
 
 		if useProjectSelector {
 			if projectsDir == "" {
 				projectsDir = "projects"
 			}
 
-			// Validate projects directory exists
 			if _, err := os.Stat(projectsDir); err != nil {
 				return fmt.Errorf("projects directory not found: %s", projectsDir)
 			}
@@ -362,12 +399,10 @@ var serverCmd = &cobra.Command{
 			fmt.Printf("Starting server with project selector (projects dir: %s)\n", projectsDir)
 			fmt.Printf("Open http://localhost:%d in your browser\n\n", serverPort)
 
-			// Start server without a specific project loaded
-			server := webserver.NewServer(cfg, nil, serverPort, projectsDir)
+			server := webserver.NewServer(cfg, nil, db, serverPort, projectsDir)
 			return server.Start()
 		}
 
-		// Original mode: specific audio and images provided
 		if cfg.AudioPath == "" {
 			return fmt.Errorf("--audio is required when not using project selector")
 		}
@@ -375,13 +410,13 @@ var serverCmd = &cobra.Command{
 			return fmt.Errorf("--images is required when not using project selector")
 		}
 
-		wd, err := workdir.New(cfg)
+		wd, err := workdir.New(context.Background(), cfg, db)
 		if err != nil {
 			return err
 		}
 
-		// Check if project exists, if not run preflight and plan
-		if !wd.Exists("timeline.json") {
+		exists, _ := db.Queries.TimelineExists(context.Background(), wd.ProjectID())
+		if exists != 1 {
 			fmt.Println("No existing timeline found. Running planning stage first...")
 
 			if err := pipeline.Preflight(cfg, wd); err != nil {
@@ -392,22 +427,22 @@ var serverCmd = &cobra.Command{
 				return err
 			}
 
-			transcript, err := pipeline.Transcribe(wd, cfg, cfg.Force)
+			transcript, err := pipeline.Transcribe(context.Background(), wd, cfg, db, cfg.Force)
 			if err != nil {
 				return err
 			}
 
-			catalog, err := pipeline.CaptionImages(wd, cfg, cfg.Force)
+			catalog, err := pipeline.CaptionImages(context.Background(), wd, cfg, db, cfg.Force)
 			if err != nil {
 				return err
 			}
 
-			windows, err := pipeline.BuildTextWindows(wd, cfg, transcript, cfg.Force)
+			windows, err := pipeline.BuildTextWindows(context.Background(), wd, cfg, db, transcript, cfg.Force)
 			if err != nil {
 				return err
 			}
 
-			_, err = pipeline.PlanTimeline(wd, cfg, windows, catalog, cfg.Force)
+			_, err = pipeline.PlanTimeline(context.Background(), wd, cfg, db, windows, catalog, cfg.Force)
 			if err != nil {
 				return err
 			}
@@ -415,8 +450,7 @@ var serverCmd = &cobra.Command{
 			fmt.Printf("Timeline created successfully!\n\n")
 		}
 
-		// Start the web server with specific project
-		server := webserver.NewServer(cfg, wd, serverPort, "")
+		server := webserver.NewServer(cfg, wd, db, serverPort, "")
 		return server.Start()
 	},
 }
@@ -443,7 +477,6 @@ func shaderDescription(s config.ShaderType) string {
 }
 
 func init() {
-	// Common flags
 	persistentFlags := rootCmd.PersistentFlags()
 	persistentFlags.StringVar(&cfg.WorkDir, "workdir", ".work", "Working directory")
 	persistentFlags.StringVar(&cfg.OllamaHost, "ollama-host", "http://localhost:11434", "Ollama API host")
@@ -452,7 +485,6 @@ func init() {
 	persistentFlags.BoolVar(&cfg.Force, "force", false, "Force recompute all stages")
 	persistentFlags.StringVar(&cfg.ShadersDir, "shaders-dir", "shaders", "Directory containing shader files")
 
-	// Run command flags
 	runCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
 	runCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
 	runCmd.Flags().StringVarP(&cfg.OutputDir, "out", "o", "output", "Output directory")
@@ -466,19 +498,15 @@ func init() {
 	runCmd.Flags().Float64Var(&cfg.DefaultImageWeight, "default-threshold", 0.5, "Confidence threshold below which default image is used")
 	runCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
 
-	// Caption command flags
 	captionCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
 
-	// Transcribe command flags
 	transcribeCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
 	transcribeCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
 
-	// Preview command flags
 	previewCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
 	previewCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
 	previewCmd.Flags().StringVarP(&cfg.Title, "title", "t", "", "Video title")
 
-	// Render command flags
 	renderCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
 	renderCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
 	renderCmd.Flags().StringVarP(&cfg.OutputDir, "out", "o", "output", "Output directory")
@@ -487,7 +515,6 @@ func init() {
 	renderCmd.Flags().IntVar(&cfg.BlurStrength, "blur", cfg.BlurStrength, "Background blur strength")
 	renderCmd.Flags().IntVar(&cfg.FontSize, "font-size", cfg.FontSize, "Base subtitle font size")
 
-	// Plan command flags
 	planCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
 	planCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
 	planCmd.Flags().StringVarP(&cfg.Title, "title", "t", "", "Video title (used for image selection context)")
@@ -495,7 +522,6 @@ func init() {
 	planCmd.Flags().Float64Var(&cfg.DefaultImageWeight, "default-threshold", 0.5, "Confidence threshold for default image")
 	planCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
 
-	// Server command flags
 	serverCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (optional if using --projects-dir)")
 	serverCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (optional if using --projects-dir)")
 	serverCmd.Flags().StringVar(&projectsDir, "projects-dir", "", "Directory containing project folders (default: 'projects' if audio/images not specified)")

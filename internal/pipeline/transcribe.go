@@ -1,8 +1,8 @@
-// ./internal/pipeline/transcribe.go
 package pipeline
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,19 +13,18 @@ import (
 	"strings"
 
 	"github.com/cork89/clippers/internal/config"
+	"github.com/cork89/clippers/internal/database"
 	"github.com/cork89/clippers/internal/types"
 	"github.com/cork89/clippers/internal/workdir"
 )
 
-// Transcribe runs whisper.cpp on the normalized audio
-func Transcribe(wd *workdir.WorkDir, cfg *config.Config, force bool) (*types.Transcript, error) {
-	if !force && wd.Exists("transcript.json") {
-		fmt.Println("==> Transcription (cached)")
-		var t types.Transcript
-		if err := wd.ReadJSON("transcript.json", &t); err != nil {
-			return nil, fmt.Errorf("failed to read transcript: %w", err)
+func Transcribe(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, db *database.DB, force bool) (*types.Transcript, error) {
+	if !force {
+		exists, _ := db.Queries.TranscriptExists(ctx, wd.ProjectID())
+		if exists == 1 {
+			fmt.Println("==> Transcription (cached)")
+			return db.GetFullTranscript(ctx, wd.ProjectID())
 		}
-		return &t, nil
 	}
 
 	fmt.Println("==> Transcribing audio")
@@ -33,13 +32,11 @@ func Transcribe(wd *workdir.WorkDir, cfg *config.Config, force bool) (*types.Tra
 	audioPath := wd.Path("audio.wav")
 	outputBase := wd.Path("transcript")
 
-	// Find whisper binary
 	whisperBin := findWhisper()
 	if whisperBin == "" {
 		return nil, fmt.Errorf("whisper.cpp not found")
 	}
 
-	// Run whisper.cpp with SRT output
 	cmd := exec.Command(whisperBin,
 		"-m", findWhisperModel(cfg.WhisperModel),
 		"-f", audioPath,
@@ -52,14 +49,12 @@ func Transcribe(wd *workdir.WorkDir, cfg *config.Config, force bool) (*types.Tra
 		return nil, fmt.Errorf("whisper.cpp failed: %w\n%s", err, string(output))
 	}
 
-	// Parse the SRT file
 	srtPath := outputBase + ".srt"
 	transcript, err := parseSRT(srtPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse SRT: %w", err)
 	}
 
-	// Get audio duration
 	duration, err := getAudioDuration(audioPath)
 	if err != nil {
 		if len(transcript.Segments) > 0 {
@@ -69,9 +64,11 @@ func Transcribe(wd *workdir.WorkDir, cfg *config.Config, force bool) (*types.Tra
 	transcript.DurationSec = duration
 	transcript.Language = "en"
 
-	if err := wd.WriteJSON("transcript.json", transcript); err != nil {
-		return nil, fmt.Errorf("failed to write transcript: %w", err)
+	if err := db.SaveFullTranscript(ctx, wd.ProjectID(), transcript); err != nil {
+		return nil, fmt.Errorf("failed to save transcript: %w", err)
 	}
+
+	os.Remove(srtPath)
 
 	fmt.Printf("  ✓ Transcribed %d segments (%.1fs)\n", len(transcript.Segments), duration)
 	return transcript, nil

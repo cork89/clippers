@@ -1,26 +1,22 @@
-// ./internal/views/images.templ
 package views
 
 import (
 	"fmt"
-	"github.com/cork89/clippers/internal/pipeline"
+	"github.com/cork89/clippers/internal/database"
 )
 
-// ImagesData holds the data for rendering the image catalog
 type ImagesData struct {
-	Images  []pipeline.ImageCaption
-	Filter  string
+	Images []database.ImageCaption
+	Filter string
 }
 
-// ImageCatalog renders the image browser
 templ ImageCatalog(data ImagesData) {
 	for _, img := range data.Images {
 		@ImageCard(img)
 	}
 }
 
-// ImageCard renders a single image card
-templ ImageCard(img pipeline.ImageCaption) {
+templ ImageCard(img database.ImageCaption) {
 	<div 
 		class="image-card"
 		data-image-id={ img.ID }
@@ -48,7 +44,6 @@ templ ImageCard(img pipeline.ImageCaption) {
 	</div>
 }
 
-// EmptyImages renders when no images exist
 templ EmptyImages() {
 	<div class="loading">
 		<p>No images found.</p>
