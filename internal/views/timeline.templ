@@ -10,19 +10,20 @@ import (
 type TimelineData struct {
 	Timeline     types.Timeline
 	DefaultName  string
+	ProjectName  string
 }
 
 // TimelineGrid renders the timeline as a grid of segments
 templ TimelineGrid(data TimelineData) {
 	<div class="timeline-grid" id="timeline-grid">
 		for i, entry := range data.Timeline.Entries {
-			@TimelineCell(i, entry, data.DefaultName)
+			@TimelineCell(i, entry, data.DefaultName, data.ProjectName)
 		}
 	</div>
 }
 
 // TimelineCell renders a single timeline cell
-templ TimelineCell(index int, entry types.TimelineEntry, defaultName string) {
+templ TimelineCell(index int, entry types.TimelineEntry, defaultName string, projectName string) {
 	{{ 
 		isDefault := entry.ImageID == defaultName
 		confidence := entry.Confidence
@@ -47,7 +48,7 @@ templ TimelineCell(index int, entry types.TimelineEntry, defaultName string) {
 		</div>
 		<div class="thumbnail">
 			<img 
-				src={ fmt.Sprintf("/api/image/%s", entry.ImageID) } 
+				src={ fmt.Sprintf("/api/image/%s?project=%s", entry.ImageID, projectName) } 
 				alt={ entry.ImageID }
 				onerror="this.src='/static/placeholder.svg'"
 			/>

@@ -14,8 +14,9 @@ import (
 )
 
 type ImagesData struct {
-	Images []database.ImageCaption
-	Filter string
+	Images      []database.ImageCaption
+	Filter      string
+	ProjectName string
 }
 
 func ImageCatalog(data ImagesData) templ.Component {
@@ -40,7 +41,7 @@ func ImageCatalog(data ImagesData) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 		for _, img := range data.Images {
-			templ_7745c5c3_Err = ImageCard(img).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ImageCard(img, data.ProjectName).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -49,7 +50,7 @@ func ImageCatalog(data ImagesData) templ.Component {
 	})
 }
 
-func ImageCard(img database.ImageCaption) templ.Component {
+func ImageCard(img database.ImageCaption, projectName string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -77,7 +78,7 @@ func ImageCard(img database.ImageCaption) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(img.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 22, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 23, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -90,7 +91,7 @@ func ImageCard(img database.ImageCaption) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/api/segment/current/image?image_id=%s", img.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 23, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 24, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -103,7 +104,7 @@ func ImageCard(img database.ImageCaption) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"image_id": "%s"}`, img.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 27, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 28, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -114,9 +115,9 @@ func ImageCard(img database.ImageCaption) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/api/image/%s", img.ID))
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/api/image/%s?project=%s", img.ID, projectName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 30, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 31, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -129,7 +130,7 @@ func ImageCard(img database.ImageCaption) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(img.Caption)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 31, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 32, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -142,7 +143,7 @@ func ImageCard(img database.ImageCaption) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(img.Caption)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 34, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 35, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -166,7 +167,7 @@ func ImageCard(img database.ImageCaption) templ.Component {
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(tag)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 39, Col: 29}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/images.templ`, Line: 40, Col: 29}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {

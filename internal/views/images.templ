@@ -6,17 +6,18 @@ import (
 )
 
 type ImagesData struct {
-	Images []database.ImageCaption
-	Filter string
+	Images      []database.ImageCaption
+	Filter      string
+	ProjectName string
 }
 
 templ ImageCatalog(data ImagesData) {
 	for _, img := range data.Images {
-		@ImageCard(img)
+		@ImageCard(img, data.ProjectName)
 	}
 }
 
-templ ImageCard(img database.ImageCaption) {
+templ ImageCard(img database.ImageCaption, projectName string) {
 	<div 
 		class="image-card"
 		data-image-id={ img.ID }
@@ -27,7 +28,7 @@ templ ImageCard(img database.ImageCaption) {
 		hx-vals={ fmt.Sprintf(`{"image_id": "%s"}`, img.ID) }
 	>
 		<img 
-			src={ fmt.Sprintf("/api/image/%s", img.ID) } 
+			src={ fmt.Sprintf("/api/image/%s?project=%s", img.ID, projectName) } 
 			alt={ img.Caption }
 			onerror="this.style.display='none'"
 		/>

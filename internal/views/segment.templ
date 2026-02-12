@@ -8,9 +8,10 @@ import (
 
 // SegmentData holds data for rendering the segment editor
 type SegmentData struct {
-	Index      int
-	Entry      types.TimelineEntry
-	Transcript string
+	Index       int
+	Entry       types.TimelineEntry
+	Transcript  string
+	ProjectName string
 }
 
 // SegmentEditor renders the segment editor panel
@@ -29,7 +30,7 @@ templ SegmentEditor(data SegmentData) {
 	<div id="editor-panel-content">
 		<div class="segment-preview">
 			<img 
-				src={ fmt.Sprintf("/api/image/%s", data.Entry.ImageID) } 
+				src={ fmt.Sprintf("/api/image/%s?project=%s", data.Entry.ImageID, data.ProjectName) } 
 				alt={ data.Entry.ImageID }
 				onerror="this.src='/static/placeholder.svg'"
 			/>

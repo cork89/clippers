@@ -406,9 +406,10 @@ func (s *Server) getSegment(w http.ResponseWriter, r *http.Request, segmentID st
 
 	if r.Header.Get("HX-Request") == "true" {
 		data := views.SegmentData{
-			Index:      index,
-			Entry:      entry,
-			Transcript: transcriptText,
+			Index:       index,
+			Entry:       entry,
+			Transcript:  transcriptText,
+			ProjectName: s.currentProject,
 		}
 		component := views.SegmentEditor(data)
 		if err := component.Render(r.Context(), w); err != nil {
@@ -485,9 +486,10 @@ func (s *Server) handleSegmentOperation(w http.ResponseWriter, r *http.Request, 
 			}
 
 			data := views.SegmentData{
-				Index:      index,
-				Entry:      timeline.Entries[index],
-				Transcript: transcriptText,
+				Index:       index,
+				Entry:       timeline.Entries[index],
+				Transcript:  transcriptText,
+				ProjectName: s.currentProject,
 			}
 			component := views.SegmentEditor(data)
 			if err := component.Render(r.Context(), w); err != nil {
@@ -531,20 +533,12 @@ func (s *Server) handleSegmentOperation(w http.ResponseWriter, r *http.Request, 
 		data := views.TimelineData{
 			Timeline:    *timeline,
 			DefaultName: defaultName,
+			ProjectName: s.currentProject,
 		}
 		component := views.TimelineGrid(data)
 		if err := component.Render(r.Context(), w); err != nil {
 			log.Printf("Error rendering timeline grid: %v", err)
 		}
-
-	case "merge":
-		if index >= len(timeline.Entries)-1 {
-			http.Error(w, "Cannot merge last segment", http.StatusBadRequest)
-			return
-		}
-
-		timeline.Entries[index].End = timeline.Entries[index+1].End
-		timeline.Entries = append(timeline.Entries[:index+1], timeline.Entries[index+2:]...)
 
 		if err := s.db.Queries.ClearTimeline(r.Context(), s.workDir.ProjectID()); err != nil {
 			http.Error(w, fmt.Sprintf("Failed to clear timeline: %v", err), http.StatusInternalServerError)
@@ -555,7 +549,7 @@ func (s *Server) handleSegmentOperation(w http.ResponseWriter, r *http.Request, 
 			return
 		}
 
-		defaultName := ""
+		defaultName = ""
 		for _, e := range timeline.Entries {
 			if e.ImageID == "default.png" || e.ImageID == "default.jpg" {
 				defaultName = e.ImageID
@@ -563,11 +557,12 @@ func (s *Server) handleSegmentOperation(w http.ResponseWriter, r *http.Request, 
 			}
 		}
 
-		data := views.TimelineData{
+		data = views.TimelineData{
 			Timeline:    *timeline,
 			DefaultName: defaultName,
+			ProjectName: s.currentProject,
 		}
-		component := views.TimelineGrid(data)
+		component = views.TimelineGrid(data)
 		if err := component.Render(r.Context(), w); err != nil {
 			log.Printf("Error rendering timeline grid: %v", err)
 		}
@@ -689,6 +684,7 @@ func (s *Server) handleTimelineHTML(w http.ResponseWriter, r *http.Request) {
 	data := views.TimelineData{
 		Timeline:    *timeline,
 		DefaultName: defaultName,
+		ProjectName: s.currentProject,
 	}
 
 	component := views.TimelineGrid(data)
@@ -721,7 +717,8 @@ func (s *Server) handleImagesHTML(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := views.ImagesData{
-		Images: catalog.Images,
+		Images:      catalog.Images,
+		ProjectName: s.currentProject,
 	}
 
 	component := views.ImageCatalog(data)

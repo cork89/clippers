@@ -19,6 +19,7 @@ import (
 type TimelineData struct {
 	Timeline    types.Timeline
 	DefaultName string
+	ProjectName string
 }
 
 // TimelineGrid renders the timeline as a grid of segments
@@ -48,7 +49,7 @@ func TimelineGrid(data TimelineData) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		for i, entry := range data.Timeline.Entries {
-			templ_7745c5c3_Err = TimelineCell(i, entry, data.DefaultName).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = TimelineCell(i, entry, data.DefaultName, data.ProjectName).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -62,7 +63,7 @@ func TimelineGrid(data TimelineData) templ.Component {
 }
 
 // TimelineCell renders a single timeline cell
-func TimelineCell(index int, entry types.TimelineEntry, defaultName string) templ.Component {
+func TimelineCell(index int, entry types.TimelineEntry, defaultName string, projectName string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -117,7 +118,7 @@ func TimelineCell(index int, entry types.TimelineEntry, defaultName string) temp
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", index))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 39, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 40, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -130,7 +131,7 @@ func TimelineCell(index int, entry types.TimelineEntry, defaultName string) temp
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/api/segment/%d", index))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 40, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 41, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -143,7 +144,7 @@ func TimelineCell(index int, entry types.TimelineEntry, defaultName string) temp
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.1fs - %.1fs", entry.Start, entry.End))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 46, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 47, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -154,9 +155,9 @@ func TimelineCell(index int, entry types.TimelineEntry, defaultName string) temp
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/api/image/%s", entry.ImageID))
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/api/image/%s?project=%s", entry.ImageID, projectName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 50, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 51, Col: 77}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -169,7 +170,7 @@ func TimelineCell(index int, entry types.TimelineEntry, defaultName string) temp
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(entry.ImageID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 51, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 52, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -182,7 +183,7 @@ func TimelineCell(index int, entry types.TimelineEntry, defaultName string) temp
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(entry.ImageID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 55, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 56, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -217,7 +218,7 @@ func TimelineCell(index int, entry types.TimelineEntry, defaultName string) temp
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.0f%% confidence", confidence*100))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 57, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/timeline.templ`, Line: 58, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {

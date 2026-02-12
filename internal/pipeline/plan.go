@@ -345,16 +345,23 @@ func smoothTimeline(entries []types.TimelineEntry, catalog *database.ImageCatalo
 		return entries
 	}
 
+	defaultBase := filepath.Base(defaultImagePath)
+
 	for i := 1; i < len(entries)-1; i++ {
 		prev := entries[i-1].ImageID
 		curr := entries[i].ImageID
 		next := entries[i+1].ImageID
 
-		if defaultImagePath != "" && curr == filepath.Base(defaultImagePath) && entries[i].Confidence < 0.3 {
+		if entries[i].Confidence >= 0.7 {
+			continue
+		}
+
+		if defaultImagePath != "" && curr == defaultBase && entries[i].Confidence < 0.3 {
 			continue
 		}
 
 		if prev == next && curr != prev {
+			fmt.Printf("    → Smoothed %s to match surrounding %s (conf: %.2f)\n", curr, prev, entries[i].Confidence)
 			entries[i].ImageID = prev
 			entries[i].Image = entries[i-1].Image
 		}
