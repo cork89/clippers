@@ -1,0 +1,107 @@
+// ./internal/views/processing.templ
+package views
+
+import "fmt"
+
+type ProcessingData struct {
+	ProjectName string
+	AudioPath   string
+	ImagesDir   string
+}
+
+templ ProcessingPage(data ProcessingData) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Processing Project - Clippers</title>
+			<script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
+			<link rel="stylesheet" href="/static/style.css"/>
+		</head>
+		<body class="projects-page">
+			<header class="app-header">
+				<h1>🎬 Clippers</h1>
+			</header>
+			<main class="projects-main">
+				<div class="no-projects" id="processing-container">
+					<h2>Project Needs Processing</h2>
+					<p>This project hasn't been processed yet.</p>
+					<div id="process-actions">
+						<button 
+							class="btn btn-primary" 
+							id="process-btn"
+							hx-post="/api/process"
+							hx-headers={ fmt.Sprintf(`{"project": "%s"}`, data.ProjectName) }
+							hx-target="#process-actions"
+							hx-swap="innerHTML"
+						>
+							Process Project
+						</button>
+						<p class="processing-note">This may take a few minutes depending on audio length.</p>
+					</div>
+					<div id="progress-area"></div>
+					<p><a href="/" class="btn btn-secondary" style="margin-top: 1rem;">Back to Projects</a></p>
+				</div>
+			</main>
+			<script src="/static/app.js"></script>
+			<script>
+				document.body.addEventListener('htmx:beforeRequest', function(evt) {
+					if (evt.detail.pathInfo.requestPath === '/api/process') {
+						var progressArea = document.getElementById('progress-area');
+						progressArea.innerHTML = '<div class="processing-loading"><svg class="spinner" viewBox="0 0 50 50" width="48" height="48"><circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"/></svg><p class="progress-status">Processing...</p></div>';
+					}
+				});
+			</script>
+		</body>
+	</html>
+}
+
+templ ProcessingProgress(stage string, message string, percent float64) {
+	<div class="processing-loading">
+		<svg class="spinner" viewBox="0 0 50 50" width="48" height="48">
+			<circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"/>
+		</svg>
+		<p class="progress-status">{ message }</p>
+		<div class="progress-bar" style="margin-top: 1rem; width: 100%;">
+			<div class="progress-fill" style={ templ.KV("width", fmt.Sprintf("%.0f%%", percent*100)) }></div>
+		</div>
+	</div>
+}
+
+templ ProcessingComplete(projectName string) {
+	<div class="processing-complete">
+		<div class="success-icon">
+			<svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="10"/>
+				<path d="M9 12l2 2 4-4"/>
+			</svg>
+		</div>
+		<p class="success-message">Processing complete!</p>
+		<a href={ templ.SafeURL("/projects/" + projectName) } class="btn btn-primary" style="margin-top: 1rem;">
+			Open Editor
+		</a>
+	</div>
+}
+
+templ ProcessingError(message string, projectName string) {
+	<div class="processing-error">
+		<div class="error-icon">
+			<svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="10"/>
+				<path d="M12 8v4M12 16h.01"/>
+			</svg>
+		</div>
+		<p class="error-message">{ message }</p>
+		<button 
+			class="btn btn-primary" 
+			style="margin-top: 1rem;"
+			hx-post="/api/process"
+			hx-headers={ fmt.Sprintf(`{"project": "%s"}`, projectName) }
+			hx-target="#process-actions"
+			hx-swap="innerHTML"
+		>
+			Try Again
+		</button>
+	</div>
+}

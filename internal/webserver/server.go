@@ -15,6 +15,7 @@ import (
 
 	"github.com/cork89/clippers/internal/config"
 	"github.com/cork89/clippers/internal/database"
+	"github.com/cork89/clippers/internal/pipeline"
 	"github.com/cork89/clippers/internal/types"
 	"github.com/cork89/clippers/internal/views"
 	"github.com/cork89/clippers/internal/workdir"
@@ -64,6 +65,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/projects/", s.handleProjectPage)
 	s.mux.HandleFunc("/api/projects", s.handleProjectsList)
 	s.mux.HandleFunc("/api/project", s.handleProject)
+	s.mux.HandleFunc("/api/process", s.handleProcess)
 	s.mux.HandleFunc("/api/timeline", s.handleTimeline)
 	s.mux.HandleFunc("/api/images", s.handleImagesAPI)
 	s.mux.HandleFunc("/api/transcript", s.handleTranscript)
@@ -197,31 +199,14 @@ func (s *Server) handleProjectPage(w http.ResponseWriter, r *http.Request) {
 
 	exists, _ := s.db.Queries.TimelineExists(r.Context(), s.workDir.ProjectID())
 	if exists != 1 {
-		w.Header().Set("Content-Type", "text/html")
-		if _, err := w.Write([]byte(`<!DOCTYPE html>
-<html>
-<head>
-    <title>Processing Project - Clippers</title>
-    <link rel="stylesheet" href="/static/style.css"/>
-    <meta http-equiv="refresh" content="5;url=/projects/` + projectName + `">
-</head>
-<body class="projects-page">
-    <header class="app-header">
-        <h1>🎬 Clippers</h1>
-    </header>
-    <main class="projects-main">
-        <div class="no-projects">
-            <h2>Project Needs Processing</h2>
-            <p>This project hasn't been processed yet. Please run the CLI command:</p>
-            <pre style="background: #3c3c3c; padding: 1rem; border-radius: 4px; overflow-x: auto;">
-clippers server -a "` + s.config.AudioPath + `" -i "` + s.config.ImagesDir + `"</pre>
-            <p>Or use the <code>clippers run</code> command first to create the timeline.</p>
-            <p><a href="/" class="btn btn-primary">Back to Projects</a></p>
-        </div>
-    </main>
-</body>
-</html>`)); err != nil {
-			log.Printf("Error writing processing page: %v", err)
+		data := views.ProcessingData{
+			ProjectName: projectName,
+			AudioPath:   s.config.AudioPath,
+			ImagesDir:   s.config.ImagesDir,
+		}
+		component := views.ProcessingPage(data)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Printf("Error rendering processing page: %v", err)
 		}
 		return
 	}
@@ -742,5 +727,132 @@ func (s *Server) handleImagesHTML(w http.ResponseWriter, r *http.Request) {
 	component := views.ImageCatalog(data)
 	if err := component.Render(r.Context(), w); err != nil {
 		log.Printf("Error rendering image catalog: %v", err)
+	}
+}
+
+func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	projectName := r.Header.Get("project")
+	if projectName == "" {
+		projectName = s.currentProject
+	}
+
+	if s.workDir == nil || s.currentProject != projectName {
+		projectPath := filepath.Join(s.projectsDir, projectName)
+
+		projects, err := DiscoverProjects(s.projectsDir)
+		if err != nil {
+			component := views.ProcessingError(fmt.Sprintf("Failed to list projects: %v", err), projectName)
+			if err := component.Render(r.Context(), w); err != nil {
+				log.Printf("Error rendering error: %v", err)
+			}
+			return
+		}
+
+		var foundProject *ProjectInfo
+		for i := range projects {
+			if projects[i].Name == projectName {
+				foundProject = &projects[i]
+				break
+			}
+		}
+
+		if foundProject == nil {
+			component := views.ProcessingError("Project not found", projectName)
+			if err := component.Render(r.Context(), w); err != nil {
+				log.Printf("Error rendering error: %v", err)
+			}
+			return
+		}
+
+		s.config.AudioPath = filepath.Join(projectPath, foundProject.AudioFile)
+		s.config.ImagesDir = foundProject.ImagesDir
+		s.currentProject = projectName
+
+		wd, err := workdir.New(r.Context(), s.config, s.db)
+		if err != nil {
+			component := views.ProcessingError(fmt.Sprintf("Failed to create work directory: %v", err), projectName)
+			if err := component.Render(r.Context(), w); err != nil {
+				log.Printf("Error rendering error: %v", err)
+			}
+			return
+		}
+		s.workDir = wd
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		component := views.ProcessingError("Streaming not supported", projectName)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Printf("Error rendering error: %v", err)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+
+	stages := []struct {
+		name   string
+		action func() error
+	}{
+		{"Preflight", func() error { return pipeline.Preflight(s.config, s.workDir) }},
+		{"Normalizing audio", func() error {
+			_, err := pipeline.NormalizeAudio(s.workDir, s.config.AudioPath, s.config.Force)
+			return err
+		}},
+		{"Transcribing audio", func() error {
+			_, err := pipeline.Transcribe(r.Context(), s.workDir, s.config, s.db, s.config.Force)
+			return err
+		}},
+		{"Captioning images", func() error {
+			_, err := pipeline.CaptionImages(r.Context(), s.workDir, s.config, s.db, s.config.Force)
+			return err
+		}},
+		{"Building text windows", func() error {
+			transcript, err := s.db.GetFullTranscript(r.Context(), s.workDir.ProjectID())
+			if err != nil {
+				return err
+			}
+			_, err = pipeline.BuildTextWindows(r.Context(), s.workDir, s.config, s.db, transcript, s.config.Force)
+			return err
+		}},
+		{"Planning timeline", func() error {
+			windows, err := s.db.GetTextWindows(r.Context(), s.workDir.ProjectID())
+			if err != nil {
+				return err
+			}
+			catalog, err := s.db.GetImageCatalog(r.Context(), s.workDir.ProjectID())
+			if err != nil {
+				return err
+			}
+			_, err = pipeline.PlanTimeline(r.Context(), s.workDir, s.config, s.db, windows, catalog, s.config.Force)
+			return err
+		}},
+	}
+
+	for i, stage := range stages {
+		percent := float64(i) / float64(len(stages))
+		component := views.ProcessingProgress(stage.name, stage.name+"...", percent)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Printf("Error rendering progress: %v", err)
+		}
+		flusher.Flush()
+
+		if err := stage.action(); err != nil {
+			component := views.ProcessingError(fmt.Sprintf("%s failed: %v", stage.name, err), projectName)
+			if err := component.Render(r.Context(), w); err != nil {
+				log.Printf("Error rendering error: %v", err)
+			}
+			return
+		}
+	}
+
+	component := views.ProcessingComplete(projectName)
+	if err := component.Render(r.Context(), w); err != nil {
+		log.Printf("Error rendering complete: %v", err)
 	}
 }
