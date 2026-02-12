@@ -10,7 +10,7 @@ import (
 
 	"github.com/cork89/clippers/internal/config"
 	"github.com/cork89/clippers/internal/database"
-	"github.com/cork89/clippers/internal/ollama"
+	"github.com/cork89/clippers/internal/llm"
 	"github.com/cork89/clippers/internal/types"
 	"github.com/cork89/clippers/internal/workdir"
 )
@@ -111,7 +111,7 @@ func PlanTimeline(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, 
 		fmt.Printf("  ✓ Using title context: %q\n", cfg.Title)
 	}
 
-	client := ollama.NewClient(cfg.OllamaHost)
+	provider := NewLLMProvider(cfg)
 
 	catalogSummary := buildCatalogSummaryWithTitle(catalog, cfg.Title, hasDefault)
 
@@ -124,7 +124,7 @@ func PlanTimeline(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, 
 	for i, window := range windows {
 		fmt.Printf("  [%d/%d] %.1fs-%.1fs... ", i+1, len(windows), window.Start, window.End)
 
-		selection, err := selectImageForWindow(client, cfg, window, catalogSummary, previousImageID, hasDefault)
+		selection, err := selectImageForWindow(provider, cfg, window, catalogSummary, previousImageID, hasDefault)
 		if err != nil {
 			fmt.Printf("failed: %v\n", err)
 			selection = &SelectionResult{
@@ -236,10 +236,10 @@ func buildCatalogSummaryWithTitle(catalog *database.ImageCatalog, title string, 
 	return sb.String()
 }
 
-func selectImageForWindow(client *ollama.Client, cfg *config.Config, window database.TextWindowData, catalog, previousID string, hasDefault bool) (*SelectionResult, error) {
+func selectImageForWindow(provider llm.Provider, cfg *config.Config, window database.TextWindowData, catalog, previousID string, hasDefault bool) (*SelectionResult, error) {
 	prompt := buildSelectionPromptWithTitle(cfg, window, catalog, previousID, hasDefault)
 
-	response, err := client.GenerateText(cfg.SelectModel, prompt, true)
+	response, err := provider.GenerateText(cfg.SelectModel, prompt, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate text: %w", err)
 	}

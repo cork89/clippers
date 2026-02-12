@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/cork89/clippers/internal/config"
-	"github.com/cork89/clippers/internal/ollama"
+	"github.com/cork89/clippers/internal/llm"
 	"github.com/cork89/clippers/internal/workdir"
 )
 
@@ -42,11 +42,10 @@ func Preflight(cfg *config.Config, wd *workdir.WorkDir) error {
 	}
 	fmt.Printf("  ✓ SubtitleEdit found: %s\n", subtitleEditBin)
 
-	// Check Ollama
-	if err := preflightOllama(cfg, wd); err != nil {
-		return fmt.Errorf("ollama not reachable: %w\n  Make sure Ollama is running: ollama serve", err)
+	// Check LLM provider
+	if err := preflightLLM(cfg, wd); err != nil {
+		return err
 	}
-	fmt.Printf("  ✓ ollama reachable at %s\n", cfg.OllamaHost)
 
 	// Check audio file exists
 	if _, err := os.Stat(cfg.AudioPath); err != nil {
@@ -73,26 +72,38 @@ func Preflight(cfg *config.Config, wd *workdir.WorkDir) error {
 	return nil
 }
 
-func preflightOllama(cfg *config.Config, wd *workdir.WorkDir) error {
-	if !needsOllama(cfg, wd) {
+func preflightLLM(cfg *config.Config, wd *workdir.WorkDir) error {
+	if !needsLLM(cfg, wd) {
 		return nil
 	}
 
-	client := ollama.NewClient(cfg.OllamaHost)
+	switch cfg.LLMProvider {
+	case config.LLMProviderOpenRouter:
+		apiKey := os.Getenv("OPENROUTER_API_KEY")
+		if apiKey == "" {
+			return fmt.Errorf("OPENROUTER_API_KEY not set in .env file")
+		}
+		fmt.Println("  ✓ OpenRouter API key found")
+		return nil
+	default:
+		client := llm.NewOllamaClient(cfg.OllamaHost)
 
-	if err := client.Ping(); err != nil {
-		return fmt.Errorf("ollama not reachable: %w", err)
+		if err := client.Ping(); err != nil {
+			return fmt.Errorf("ollama not reachable: %w\n  Make sure Ollama is running: ollama serve", err)
+		}
+		fmt.Printf("  ✓ ollama reachable at %s\n", cfg.OllamaHost)
+
+		ollamaClient := client
+		if ok, _ := ollamaClient.HasModel(cfg.VisionModel); !ok {
+			return fmt.Errorf("vision model missing: %s", cfg.VisionModel)
+		}
+
+		if ok, _ := ollamaClient.HasModel(cfg.SelectModel); !ok {
+			return fmt.Errorf("select model missing: %s", cfg.SelectModel)
+		}
+
+		return nil
 	}
-
-	if ok, _ := client.HasModel(cfg.VisionModel); !ok {
-		return fmt.Errorf("vision model missing: %s", cfg.VisionModel)
-	}
-
-	if ok, _ := client.HasModel(cfg.SelectModel); !ok {
-		return fmt.Errorf("select model missing: %s", cfg.SelectModel)
-	}
-
-	return nil
 }
 
 func findWhisper() string {
@@ -127,7 +138,7 @@ func listImages(dir string) ([]string, error) {
 	return images, nil
 }
 
-func needsOllama(cfg *config.Config, wd *workdir.WorkDir) bool {
+func needsLLM(cfg *config.Config, wd *workdir.WorkDir) bool {
 	if cfg.Force {
 		return true
 	}

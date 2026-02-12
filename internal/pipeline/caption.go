@@ -9,7 +9,7 @@ import (
 
 	"github.com/cork89/clippers/internal/config"
 	"github.com/cork89/clippers/internal/database"
-	"github.com/cork89/clippers/internal/ollama"
+	"github.com/cork89/clippers/internal/llm"
 	"github.com/cork89/clippers/internal/workdir"
 )
 
@@ -45,9 +45,9 @@ func CaptionImages(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config,
 		}
 	}
 
-	fmt.Println("==> Captioning images with", cfg.VisionModel)
+	provider := NewLLMProvider(cfg)
 
-	client := ollama.NewClient(cfg.OllamaHost)
+	fmt.Println("==> Captioning images with", cfg.VisionModel)
 
 	images, err := listImages(cfg.ImagesDir)
 	if err != nil {
@@ -69,7 +69,7 @@ func CaptionImages(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config,
 		}
 		fmt.Print("... ")
 
-		caption, err := captionImage(client, cfg.VisionModel, imagePath)
+		caption, err := captionImage(provider, cfg.VisionModel, imagePath)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to caption image, %v", err)
 		} else {
@@ -100,15 +100,15 @@ func CaptionImages(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config,
 	return &catalog, nil
 }
 
-func captionImage(client *ollama.Client, model, imagePath string) (*database.ImageCaption, error) {
-	response, err := client.GenerateWithImage(model, captionPrompt, imagePath, true)
+func captionImage(provider llm.Provider, model, imagePath string) (*database.ImageCaption, error) {
+	response, err := provider.GenerateWithImage(model, captionPrompt, imagePath, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate captions: %w", err)
 	}
 
 	caption, err := parseCaptionResponse(response)
 	if err != nil {
-		response, err = client.GenerateWithImage(model, strictCaptionPrompt, imagePath, true)
+		response, err = provider.GenerateWithImage(model, strictCaptionPrompt, imagePath, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate strict captions: %w", err)
 		}

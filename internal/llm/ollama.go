@@ -1,4 +1,5 @@
-package ollama
+// ./internal/llm/ollama.go
+package llm
 
 import (
 	"bytes"
@@ -11,49 +12,43 @@ import (
 	"time"
 )
 
-// Client handles communication with Ollama API
-type Client struct {
+type OllamaClient struct {
 	host       string
 	httpClient *http.Client
 }
 
-// NewClient creates a new Ollama client
-func NewClient(host string) *Client {
-	return &Client{
+func NewOllamaClient(host string) *OllamaClient {
+	return &OllamaClient{
 		host: host,
 		httpClient: &http.Client{
-			Timeout: 5 * time.Minute, // Vision models can be slow
+			Timeout: 5 * time.Minute,
 		},
 	}
 }
 
-// GenerateRequest is the request body for /api/generate
-type GenerateRequest struct {
-	Model   string   `json:"model"`
-	Prompt  string   `json:"prompt"`
-	Images  []string `json:"images,omitempty"` // base64 encoded
-	Stream  bool     `json:"stream"`
-	Format  string   `json:"format,omitempty"` // "json" for JSON mode
-	Options *Options `json:"options,omitempty"`
+type ollamaGenerateRequest struct {
+	Model   string         `json:"model"`
+	Prompt  string         `json:"prompt"`
+	Images  []string       `json:"images,omitempty"`
+	Stream  bool           `json:"stream"`
+	Format  string         `json:"format,omitempty"`
+	Options *ollamaOptions `json:"options,omitempty"`
 }
 
-// Options for generation
-type Options struct {
+type ollamaOptions struct {
 	Temperature float64 `json:"temperature,omitempty"`
 	Seed        int     `json:"seed,omitempty"`
 }
 
-// GenerateResponse is the response from /api/generate
-type GenerateResponse struct {
+type ollamaGenerateResponse struct {
 	Model    string `json:"model"`
 	Response string `json:"response"`
 	Done     bool   `json:"done"`
 	Error    string `json:"error,omitempty"`
 }
 
-// Generate sends a generate request to Ollama
-func (c *Client) Generate(req *GenerateRequest) (*GenerateResponse, error) {
-	req.Stream = false // We don't handle streaming
+func (c *OllamaClient) generate(req *ollamaGenerateRequest) (*ollamaGenerateResponse, error) {
+	req.Stream = false
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -75,7 +70,7 @@ func (c *Client) Generate(req *GenerateRequest) (*GenerateResponse, error) {
 		return nil, fmt.Errorf("ollama returned status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	var result GenerateResponse
+	var result ollamaGenerateResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -87,9 +82,7 @@ func (c *Client) Generate(req *GenerateRequest) (*GenerateResponse, error) {
 	return &result, nil
 }
 
-// GenerateWithImage sends a vision request with an image
-func (c *Client) GenerateWithImage(model, prompt, imagePath string, jsonMode bool) (string, error) {
-	// Read and encode image
+func (c *OllamaClient) GenerateWithImage(model, prompt, imagePath string, jsonMode bool) (string, error) {
 	imageData, err := os.ReadFile(imagePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read image: %w", err)
@@ -97,11 +90,11 @@ func (c *Client) GenerateWithImage(model, prompt, imagePath string, jsonMode boo
 
 	encoded := base64.StdEncoding.EncodeToString(imageData)
 
-	req := &GenerateRequest{
+	req := &ollamaGenerateRequest{
 		Model:  model,
 		Prompt: prompt,
 		Images: []string{encoded},
-		Options: &Options{
+		Options: &ollamaOptions{
 			Temperature: 0,
 		},
 	}
@@ -110,7 +103,7 @@ func (c *Client) GenerateWithImage(model, prompt, imagePath string, jsonMode boo
 		req.Format = "json"
 	}
 
-	resp, err := c.Generate(req)
+	resp, err := c.generate(req)
 	if err != nil {
 		return "", err
 	}
@@ -118,12 +111,11 @@ func (c *Client) GenerateWithImage(model, prompt, imagePath string, jsonMode boo
 	return resp.Response, nil
 }
 
-// GenerateText sends a text-only request
-func (c *Client) GenerateText(model, prompt string, jsonMode bool) (string, error) {
-	req := &GenerateRequest{
+func (c *OllamaClient) GenerateText(model, prompt string, jsonMode bool) (string, error) {
+	req := &ollamaGenerateRequest{
 		Model:  model,
 		Prompt: prompt,
-		Options: &Options{
+		Options: &ollamaOptions{
 			Temperature: 0,
 		},
 	}
@@ -132,7 +124,7 @@ func (c *Client) GenerateText(model, prompt string, jsonMode bool) (string, erro
 		req.Format = "json"
 	}
 
-	resp, err := c.Generate(req)
+	resp, err := c.generate(req)
 	if err != nil {
 		return "", err
 	}
@@ -140,8 +132,7 @@ func (c *Client) GenerateText(model, prompt string, jsonMode bool) (string, erro
 	return resp.Response, nil
 }
 
-// Ping checks if Ollama is reachable
-func (c *Client) Ping() error {
+func (c *OllamaClient) Ping() error {
 	resp, err := c.httpClient.Get(c.host + "/api/tags")
 	if err != nil {
 		return fmt.Errorf("cannot reach Ollama at %s: %w", c.host, err)
@@ -155,8 +146,7 @@ func (c *Client) Ping() error {
 	return nil
 }
 
-// HasModel checks if a model is available
-func (c *Client) HasModel(name string) (bool, error) {
+func (c *OllamaClient) HasModel(name string) (bool, error) {
 	resp, err := c.httpClient.Get(c.host + "/api/tags")
 	if err != nil {
 		return false, err

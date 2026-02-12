@@ -2,7 +2,12 @@ module github.com/cork89/clippers
 
 go 1.25.5
 
-require github.com/spf13/cobra v1.9.1
+require (
+	github.com/joho/godotenv v1.5.1
+	github.com/revrost/go-openrouter v1.1.5
+	github.com/spf13/cobra v1.9.1
+	modernc.org/sqlite v1.45.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -16,7 +21,6 @@ require (
 	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.45.0 // indirect
 )
 
 require (
