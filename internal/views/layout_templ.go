@@ -52,4 +52,59 @@ func Layout(title string) templ.Component {
 	})
 }
 
+func LayoutWithProject(title string, projectName string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var3 == nil {
+			templ_7745c5c3_Var3 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 100, Col: 17}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</title><script src=\"https://unpkg.com/htmx.org@1.9.12\" integrity=\"sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2\" crossorigin=\"anonymous\"></script><script src=\"https://unpkg.com/htmx.org/dist/ext/ws.js\"></script><link rel=\"stylesheet\" href=\"/static/style.css\"></head><body hx-boost=\"true\" hx-ext=\"ws\" ws-connect=\"/api/ws/progress\"><header class=\"app-header\"><nav class=\"breadcrumb-nav\"><a href=\"/\" class=\"breadcrumb-link\">projects</a> <span class=\"breadcrumb-separator\">/</span> <span class=\"breadcrumb-current\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(projectName)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 110, Col: 51}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</span></nav><div class=\"header-actions\"><button id=\"save-btn\" class=\"btn btn-primary\" hx-post=\"/api/save\" hx-swap=\"none\">💾 Save</button> <button id=\"render-btn\" class=\"btn btn-success\" hx-post=\"/api/render\" hx-swap=\"none\">🎥 Render</button></div></header><main class=\"app-main\"><div class=\"editor-layout\"><!-- Timeline Grid --><section class=\"timeline-section\" id=\"timeline-container\" hx-get=\"/api/timeline/html\" hx-trigger=\"load\" hx-swap=\"innerHTML\"><div class=\"loading\">Loading timeline...</div></section><!-- Editor Panel --><aside class=\"editor-panel\" id=\"editor-panel\"><div class=\"panel-header\"><h2>Segment Editor</h2></div><div class=\"panel-content\" id=\"editor-panel-content\"><p class=\"empty-state\">Click a segment to edit</p></div></aside><!-- Image Browser --><section class=\"images-section\" id=\"images-container\"><div class=\"panel-header\"><h2>Images</h2><div class=\"search-box\"><input type=\"text\" placeholder=\"Search images...\" class=\"search-input\" id=\"image-search\" onkeyup=\"filterImages(this.value)\"></div></div><div class=\"images-grid\" id=\"images-grid\" hx-get=\"/api/images/html\" hx-trigger=\"load\" hx-swap=\"innerHTML\"><div class=\"loading\">Loading images...</div></div></section></div></main><!-- Progress Modal --><div id=\"progress-modal\" class=\"modal hidden\"><div class=\"modal-content\"><h3>Rendering Video...</h3><div class=\"progress-bar\"><div class=\"progress-fill\" id=\"progress-fill\" style=\"width: 0%\"></div></div><div class=\"progress-text\" id=\"progress-text\">Starting...</div></div></div><script src=\"/static/app.js\"></script></body></html>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
 var _ = templruntime.GeneratedTemplate

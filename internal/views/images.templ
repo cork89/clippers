@@ -14,11 +14,9 @@ type ImagesData struct {
 
 // ImageCatalog renders the image browser
 templ ImageCatalog(data ImagesData) {
-	<div class="images-grid" id="images-grid">
-		for _, img := range data.Images {
-			@ImageCard(img)
-		}
-	</div>
+	for _, img := range data.Images {
+		@ImageCard(img)
+	}
 }
 
 // ImageCard renders a single image card

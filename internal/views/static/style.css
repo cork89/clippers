@@ -100,6 +100,37 @@ body {
   gap: 0.625rem;
 }
 
+/* ──────────────── Breadcrumb Navigation ──────────────── */
+
+.breadcrumb-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.breadcrumb-link {
+  color: var(--accent-blue);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: var(--accent-cyan);
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.breadcrumb-current {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 /* ──────────────── Buttons ──────────────── */
 
 .btn {

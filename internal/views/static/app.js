@@ -127,12 +127,6 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('save-btn')?.click();
   }
   
-  // Ctrl+R to render
-  if (e.ctrlKey && e.key === 'r') {
-    e.preventDefault();
-    document.getElementById('render-btn')?.click();
-  }
-  
   // Escape to close modals
   if (e.key === 'Escape') {
     document.querySelectorAll('.modal').forEach(modal => {
