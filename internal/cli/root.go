@@ -21,6 +21,10 @@ var aspectsFlag string
 var shaderFlag string
 var llmProviderFlag string
 
+func ReloadConfig() {
+	cfg.ReloadFromEnv()
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "clippers",
 	Short: "Audio Clip to Video converter",
@@ -41,10 +45,12 @@ var runCmd = &cobra.Command{
 			cfg.OutputDir = "output"
 		}
 
-		if !config.IsValidLLMProvider(llmProviderFlag) {
-			return fmt.Errorf("invalid LLM provider: %s (valid: ollama, openrouter)", llmProviderFlag)
+		if llmProviderFlag != "" {
+			if !config.IsValidLLMProvider(llmProviderFlag) {
+				return fmt.Errorf("invalid LLM provider: %s (valid: ollama, openrouter)", llmProviderFlag)
+			}
+			cfg.LLMProvider = config.LLMProvider(llmProviderFlag)
 		}
-		cfg.LLMProvider = config.LLMProvider(llmProviderFlag)
 
 		if aspectsFlag != "" {
 			cfg.Aspects = parseAspects(aspectsFlag)
@@ -84,10 +90,12 @@ var captionCmd = &cobra.Command{
 			cfg.AudioPath = "dummy"
 		}
 
-		if !config.IsValidLLMProvider(llmProviderFlag) {
-			return fmt.Errorf("invalid LLM provider: %s (valid: ollama, openrouter)", llmProviderFlag)
+		if llmProviderFlag != "" {
+			if !config.IsValidLLMProvider(llmProviderFlag) {
+				return fmt.Errorf("invalid LLM provider: %s (valid: ollama, openrouter)", llmProviderFlag)
+			}
+			cfg.LLMProvider = config.LLMProvider(llmProviderFlag)
 		}
-		cfg.LLMProvider = config.LLMProvider(llmProviderFlag)
 
 		db, err := database.Open(".clippers.db")
 		if err != nil {
@@ -321,10 +329,12 @@ var planCmd = &cobra.Command{
 			return fmt.Errorf("--images is required")
 		}
 
-		if !config.IsValidLLMProvider(llmProviderFlag) {
-			return fmt.Errorf("invalid LLM provider: %s (valid: ollama, openrouter)", llmProviderFlag)
+		if llmProviderFlag != "" {
+			if !config.IsValidLLMProvider(llmProviderFlag) {
+				return fmt.Errorf("invalid LLM provider: %s (valid: ollama, openrouter)", llmProviderFlag)
+			}
+			cfg.LLMProvider = config.LLMProvider(llmProviderFlag)
 		}
-		cfg.LLMProvider = config.LLMProvider(llmProviderFlag)
 
 		db, err := database.Open(".clippers.db")
 		if err != nil {
@@ -397,10 +407,12 @@ var serverCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		useProjectSelector := projectsDir != "" || (cfg.AudioPath == "" && cfg.ImagesDir == "")
 
-		if !config.IsValidLLMProvider(llmProviderFlag) {
-			return fmt.Errorf("invalid LLM provider: %s (valid: ollama, openrouter)", llmProviderFlag)
+		if llmProviderFlag != "" {
+			if !config.IsValidLLMProvider(llmProviderFlag) {
+				return fmt.Errorf("invalid LLM provider: %s (valid: ollama, openrouter)", llmProviderFlag)
+			}
+			cfg.LLMProvider = config.LLMProvider(llmProviderFlag)
 		}
-		cfg.LLMProvider = config.LLMProvider(llmProviderFlag)
 
 		db, err := database.Open(".clippers.db")
 		if err != nil {
@@ -501,7 +513,7 @@ func init() {
 	persistentFlags := rootCmd.PersistentFlags()
 	persistentFlags.StringVar(&cfg.WorkDir, "workdir", ".work", "Working directory")
 	persistentFlags.StringVar(&cfg.OllamaHost, "ollama-host", "http://localhost:11434", "Ollama API host")
-	persistentFlags.StringVar(&llmProviderFlag, "llm-provider", "ollama", "LLM provider: ollama or openrouter")
+	persistentFlags.StringVar(&llmProviderFlag, "llm-provider", "", "LLM provider: ollama or openrouter")
 	persistentFlags.StringVar(&cfg.VisionModel, "vision-model", "llava", "Vision model for captioning")
 	persistentFlags.StringVar(&cfg.SelectModel, "select-model", "gemma3:4b-it-qat", "Model for image selection")
 	persistentFlags.BoolVar(&cfg.Force, "force", false, "Force recompute all stages")

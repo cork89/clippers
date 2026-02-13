@@ -170,6 +170,13 @@ func DefaultConfig() *Config {
 	}
 }
 
+func (c *Config) ReloadFromEnv() {
+	c.LLMProvider = LLMProvider(getEnvString("CLIPPERS_LLM_PROVIDER", string(c.LLMProvider)))
+	c.OllamaHost = getEnvString("CLIPPERS_OLLAMA_HOST", c.OllamaHost)
+	c.VisionModel = getEnvString("CLIPPERS_VISION_MODEL", c.VisionModel)
+	c.SelectModel = getEnvString("CLIPPERS_SELECT_MODEL", c.SelectModel)
+}
+
 // AspectConfig holds dimensions and subtitle settings for an aspect ratio
 type AspectConfig struct {
 	Width        int
