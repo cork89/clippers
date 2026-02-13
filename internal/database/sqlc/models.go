@@ -57,6 +57,7 @@ type TimelineEntry struct {
 	ImagePath  string          `json:"image_path"`
 	Confidence sql.NullFloat64 `json:"confidence"`
 	Reason     sql.NullString  `json:"reason"`
+	Shader     sql.NullString  `json:"shader"`
 	Ordinal    int64           `json:"ordinal"`
 }
 

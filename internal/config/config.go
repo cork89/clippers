@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/cork89/clippers/internal/types"
 )
 
 type LLMProvider string
@@ -19,29 +21,16 @@ const (
 	DefaultOpenRouterSelectModel = "openai/gpt-5-nano"
 )
 
-// ShaderType represents available shader effects
-type ShaderType string
-
-const (
-	ShaderNone         ShaderType = "none"
-	ShaderWaveDisplace ShaderType = "wave_displace"
-	ShaderEdgeGlow     ShaderType = "edge_glow"
-	ShaderLiquidFlow   ShaderType = "liquid_flow"
-	ShaderPixelMelt    ShaderType = "pixel_melt"
-	ShaderRetro        ShaderType = "retro"
-	ShaderVoronoi      ShaderType = "voronoi"
-)
-
 // ValidShaders returns all available shader options
-func ValidShaders() []ShaderType {
-	return []ShaderType{
-		ShaderNone,
-		ShaderWaveDisplace,
-		ShaderEdgeGlow,
-		ShaderLiquidFlow,
-		ShaderPixelMelt,
-		ShaderRetro,
-		ShaderVoronoi,
+func ValidShaders() []types.ShaderType {
+	return []types.ShaderType{
+		types.ShaderNone,
+		types.ShaderWaveDisplace,
+		types.ShaderEdgeGlow,
+		types.ShaderLiquidFlow,
+		types.ShaderPixelMelt,
+		types.ShaderRetro,
+		types.ShaderVoronoi,
 	}
 }
 
@@ -79,8 +68,8 @@ type Config struct {
 	MaxWords     int
 	BlurStrength int
 	FPS          int
-	Shader       ShaderType // Shader effect to apply
-	ShadersDir   string     // Directory containing shader files
+	Shader       types.ShaderType // Shader effect to apply
+	ShadersDir   string           // Directory containing shader files
 
 	// Subtitle settings
 	FontSize       int
@@ -155,7 +144,7 @@ func DefaultConfig() *Config {
 		MaxWords:           getEnvInt("CLIPPERS_MAX_WORDS", 5),
 		BlurStrength:       getEnvInt("CLIPPERS_BLUR_STRENGTH", 20),
 		FPS:                getEnvInt("CLIPPERS_FPS", 24),
-		Shader:             ShaderType(getEnvString("CLIPPERS_SHADER", string(ShaderNone))),
+		Shader:             types.ShaderType(getEnvString("CLIPPERS_SHADER", string(types.ShaderNone))),
 		ShadersDir:         getEnvString("CLIPPERS_SHADERS_DIR", "shaders"),
 		FontSize:           getEnvInt("CLIPPERS_FONT_SIZE", 60),
 		SubtitleMargin:     getEnvInt("CLIPPERS_SUBTITLE_MARGIN", 20),

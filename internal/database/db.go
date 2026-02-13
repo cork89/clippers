@@ -119,7 +119,58 @@ CREATE INDEX IF NOT EXISTS idx_windows_project ON text_windows(project_id);
 CREATE INDEX IF NOT EXISTS idx_timeline_project ON timeline_entries(project_id);
 `
 	_, err := db.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return runMigrationsFromHistory(db)
+}
+
+type migration struct {
+	name string
+	up   string
+}
+
+var migrations = []migration{
+	{
+		name: "add_timeline_shader",
+		up:   "ALTER TABLE timeline_entries ADD COLUMN shader TEXT;",
+	},
+}
+
+func runMigrationsFromHistory(db *sql.DB) error {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS migrations (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT UNIQUE NOT NULL,
+			applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	for _, m := range migrations {
+		var exists bool
+		err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM migrations WHERE name = ?)", m.name).Scan(&exists)
+		if err != nil {
+			return err
+		}
+
+		if !exists {
+			_, err := db.Exec(m.up)
+			if err != nil {
+				return fmt.Errorf("migration %s failed: %w", m.name, err)
+			}
+
+			_, err = db.Exec("INSERT INTO migrations (name) VALUES (?)", m.name)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (db *DB) CreateProject(ctx context.Context, id, audioPath, imagesDir, outputDir, audioHash, imagesHash string, settings map[string]string) error {
@@ -338,6 +389,10 @@ func (db *DB) SaveTimeline(ctx context.Context, projectID string, timeline *type
 				String: e.Reason,
 				Valid:  e.Reason != "",
 			},
+			Shader: sql.NullString{
+				String: e.Shader,
+				Valid:  e.Shader != "",
+			},
 			Ordinal: int64(i),
 		}); err != nil {
 			return err
@@ -364,6 +419,7 @@ func (db *DB) GetTimeline(ctx context.Context, projectID string) (*types.Timelin
 			Image:      e.ImagePath,
 			Confidence: e.Confidence.Float64,
 			Reason:     e.Reason.String,
+			Shader:     e.Shader.String,
 		}
 	}
 

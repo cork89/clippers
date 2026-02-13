@@ -20,7 +20,7 @@ func (q *Queries) ClearTimeline(ctx context.Context, projectID string) error {
 }
 
 const getTimeline = `-- name: GetTimeline :many
-SELECT id, project_id, start, "end", image_id, image_path, confidence, reason, ordinal 
+SELECT id, project_id, start, "end", image_id, image_path, confidence, reason, shader, ordinal 
 FROM timeline_entries WHERE project_id = ? ORDER BY ordinal
 `
 
@@ -42,6 +42,7 @@ func (q *Queries) GetTimeline(ctx context.Context, projectID string) ([]Timeline
 			&i.ImagePath,
 			&i.Confidence,
 			&i.Reason,
+			&i.Shader,
 			&i.Ordinal,
 		); err != nil {
 			return nil, err
@@ -58,8 +59,8 @@ func (q *Queries) GetTimeline(ctx context.Context, projectID string) ([]Timeline
 }
 
 const saveTimelineEntry = `-- name: SaveTimelineEntry :exec
-INSERT INTO timeline_entries (project_id, start, "end", image_id, image_path, confidence, reason, ordinal)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO timeline_entries (project_id, start, "end", image_id, image_path, confidence, reason, shader, ordinal)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type SaveTimelineEntryParams struct {
@@ -70,6 +71,7 @@ type SaveTimelineEntryParams struct {
 	ImagePath  string          `json:"image_path"`
 	Confidence sql.NullFloat64 `json:"confidence"`
 	Reason     sql.NullString  `json:"reason"`
+	Shader     sql.NullString  `json:"shader"`
 	Ordinal    int64           `json:"ordinal"`
 }
 
@@ -82,6 +84,7 @@ func (q *Queries) SaveTimelineEntry(ctx context.Context, arg SaveTimelineEntryPa
 		arg.ImagePath,
 		arg.Confidence,
 		arg.Reason,
+		arg.Shader,
 		arg.Ordinal,
 	)
 	return err
@@ -96,4 +99,19 @@ func (q *Queries) TimelineExists(ctx context.Context, projectID string) (int64, 
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const updateSegmentShader = `-- name: UpdateSegmentShader :exec
+UPDATE timeline_entries SET shader = ? WHERE id = ? AND project_id = ?
+`
+
+type UpdateSegmentShaderParams struct {
+	Shader    sql.NullString `json:"shader"`
+	ID        int64          `json:"id"`
+	ProjectID string         `json:"project_id"`
+}
+
+func (q *Queries) UpdateSegmentShader(ctx context.Context, arg UpdateSegmentShaderParams) error {
+	_, err := q.db.ExecContext(ctx, updateSegmentShader, arg.Shader, arg.ID, arg.ProjectID)
+	return err
 }

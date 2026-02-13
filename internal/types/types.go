@@ -1,5 +1,80 @@
 package types
 
+import (
+	"embed"
+	"fmt"
+)
+
+//go:embed shaders/*.glsl
+var shadersFS embed.FS
+
+// ShaderType represents available shader effects
+type ShaderType string
+
+const (
+	ShaderNone         ShaderType = "none"
+	ShaderWaveDisplace ShaderType = "wave_displace"
+	ShaderEdgeGlow     ShaderType = "edge_glow"
+	ShaderLiquidFlow   ShaderType = "liquid_flow"
+	ShaderPixelMelt    ShaderType = "pixel_melt"
+	ShaderRetro        ShaderType = "retro"
+	ShaderVoronoi      ShaderType = "voronoi"
+)
+
+type ShaderOption struct {
+	Value ShaderType
+	Label string
+	Color string
+}
+
+func ShaderOptions() []ShaderOption {
+	return []ShaderOption{
+		{Value: ShaderNone, Label: "None", Color: "#3a3a3a"},
+		{Value: ShaderWaveDisplace, Label: "Wave", Color: "#6366f1"},
+		{Value: ShaderEdgeGlow, Label: "Edge", Color: "#ec4899"},
+		{Value: ShaderLiquidFlow, Label: "Liquid", Color: "#14b8a6"},
+		{Value: ShaderPixelMelt, Label: "Pixel", Color: "#f59e0b"},
+		{Value: ShaderRetro, Label: "Retro", Color: "#8b5cf6"},
+		{Value: ShaderVoronoi, Label: "Voronoi", Color: "#10b981"},
+	}
+}
+
+func ListShaders() []ShaderType {
+	entries, _ := shadersFS.ReadDir("shaders")
+	var shaders []ShaderType
+	for _, e := range entries {
+		if !e.IsDir() && hasSuffix(e.Name(), "_browser.glsl") {
+			name := stripSuffix(e.Name(), "_browser.glsl")
+			shaders = append(shaders, ShaderType(name))
+		}
+	}
+	return shaders
+}
+
+func GetShader(name ShaderType) (string, error) {
+	data, err := shadersFS.ReadFile(fmt.Sprintf("shaders/%s_browser.glsl", name))
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func GetVertexShader() (string, error) {
+	data, err := shadersFS.ReadFile("shaders/vertex.glsl")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func hasSuffix(s, suffix string) bool {
+	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
+}
+
+func stripSuffix(s, suffix string) string {
+	return s[:len(s)-len(suffix)]
+}
+
 // Segment represents a transcribed segment from whisper
 type Segment struct {
 	Start float64 `json:"start"`
@@ -22,6 +97,7 @@ type TimelineEntry struct {
 	Image      string  `json:"image_path"`
 	Confidence float64 `json:"confidence,omitempty"`
 	Reason     string  `json:"reason,omitempty"`
+	Shader     string  `json:"shader,omitempty"`
 }
 
 // Timeline is the full video timeline

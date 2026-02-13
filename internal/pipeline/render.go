@@ -17,7 +17,7 @@ import (
 // RenderAll renders all requested aspect ratios
 func RenderAll(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, subtitlePaths []types.SubtitleAspect) ([]string, error) {
 	fmt.Printf("==> Rendering %d aspect ratio(s)\n", len(cfg.Aspects))
-	if cfg.Shader != config.ShaderNone {
+	if cfg.Shader != types.ShaderNone {
 		fmt.Printf("    Shader: %s\n", cfg.Shader)
 	}
 
@@ -68,7 +68,7 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 
 	// Pass 2 (optional): Apply shader effect
 	videoForSubtitles := intermediatePath
-	if cfg.Shader != config.ShaderNone {
+	if cfg.Shader != types.ShaderNone {
 		fmt.Printf("  Pass 2: Applying %s shader...\n", cfg.Shader)
 		if err := renderShaderPass(cfg, intermediatePath, shaderPath, aspectCfg); err != nil {
 			fmt.Printf("  Warning: shader pass failed (%v), continuing without shader\n", err)

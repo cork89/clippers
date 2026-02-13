@@ -56,6 +56,7 @@ CREATE TABLE timeline_entries (
     image_path TEXT NOT NULL,
     confidence REAL,
     reason TEXT,
+    shader TEXT,
     ordinal INTEGER NOT NULL
 );
 

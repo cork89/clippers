@@ -66,7 +66,7 @@ var runCmd = &cobra.Command{
 			if !config.IsValidShader(shaderFlag) {
 				return fmt.Errorf("invalid shader: %s (valid: %s)", shaderFlag, validShadersStr())
 			}
-			cfg.Shader = config.ShaderType(shaderFlag)
+			cfg.Shader = types.ShaderType(shaderFlag)
 		}
 
 		db, err := database.Open(".clippers.db")
@@ -265,7 +265,7 @@ var renderCmd = &cobra.Command{
 			if !config.IsValidShader(shaderFlag) {
 				return fmt.Errorf("invalid shader: %s (valid: %s)", shaderFlag, validShadersStr())
 			}
-			cfg.Shader = config.ShaderType(shaderFlag)
+			cfg.Shader = types.ShaderType(shaderFlag)
 		}
 
 		db, err := database.Open(".clippers.db")
@@ -488,21 +488,21 @@ var serverCmd = &cobra.Command{
 	},
 }
 
-func shaderDescription(s config.ShaderType) string {
+func shaderDescription(s types.ShaderType) string {
 	switch s {
-	case config.ShaderNone:
+	case types.ShaderNone:
 		return "(no effect)"
-	case config.ShaderWaveDisplace:
+	case types.ShaderWaveDisplace:
 		return "RGB channel wave displacement with chromatic aberration"
-	case config.ShaderEdgeGlow:
+	case types.ShaderEdgeGlow:
 		return "Neon edge detection with cyan/pink pulse"
-	case config.ShaderLiquidFlow:
+	case types.ShaderLiquidFlow:
 		return "Liquid pastel marble warping effect"
-	case config.ShaderPixelMelt:
+	case types.ShaderPixelMelt:
 		return "Digital pixel melting based on brightness"
-	case config.ShaderRetro:
+	case types.ShaderRetro:
 		return "VHS tape effect with tracking, grain, and scanlines"
-	case config.ShaderVoronoi:
+	case types.ShaderVoronoi:
 		return "Geometric mosaic with soft sweeping shine"
 	default:
 		return ""

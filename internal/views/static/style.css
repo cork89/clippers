@@ -462,7 +462,8 @@ body {
   margin-bottom: 1.5rem;
 }
 
-.segment-preview img {
+.segment-preview img,
+.segment-preview canvas {
   width: 100%;
   border-radius: var(--radius-md);
   margin-bottom: 1rem;
@@ -470,8 +471,94 @@ body {
   transition: transform var(--transition-base);
 }
 
-.segment-preview img:hover {
+.segment-preview img:hover,
+.segment-preview canvas:hover {
   transform: scale(1.02);
+}
+
+.segment-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.shader-selector {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 0.875rem;
+}
+
+.shader-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.625rem;
+}
+
+.shader-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.shader-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.shader-controls .shader-options {
+  flex: 1;
+}
+
+.shader-play-btn {
+  padding: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.shader-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  background: var(--bg-tertiary);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.shader-option:hover {
+  background: var(--bg-hover);
+  transform: translateY(-2px);
+}
+
+.shader-option.selected {
+  border-color: var(--accent-primary);
+  background: var(--bg-active);
+}
+
+.shader-ball {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  box-shadow: inset 0 -2px 4px rgba(0,0,0,0.25), 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.shader-name {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.shader-option.selected .shader-name {
+  color: var(--accent-primary);
 }
 
 .segment-info {

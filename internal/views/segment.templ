@@ -3,6 +3,7 @@ package views
 
 import (
 	"fmt"
+
 	"github.com/cork89/clippers/internal/types"
 )
 
@@ -16,7 +17,7 @@ type SegmentData struct {
 
 // SegmentEditor renders the segment editor panel
 templ SegmentEditor(data SegmentData) {
-	{{ 
+	{{
 		duration := data.Entry.End - data.Entry.Start
 		confidence := data.Entry.Confidence
 		confidenceClass := "confidence-high"
@@ -25,60 +26,102 @@ templ SegmentEditor(data SegmentData) {
 		} else if confidence < 0.7 {
 			confidenceClass = "confidence-medium"
 		}
+		imageSrc := fmt.Sprintf("/api/image/%s?project=%s", data.Entry.ImageID, data.ProjectName)
 	}}
-	
 	<div id="editor-panel-content">
 		<input type="hidden" id="segment-start" value={ fmt.Sprintf("%.3f", data.Entry.Start) }/>
 		<input type="hidden" id="segment-end" value={ fmt.Sprintf("%.3f", data.Entry.End) }/>
-		<div class="segment-preview">
-			<img 
-				src={ fmt.Sprintf("/api/image/%s?project=%s", data.Entry.ImageID, data.ProjectName) } 
-				alt={ data.Entry.ImageID }
-				onerror="this.src='/static/placeholder.svg'"
-			/>
+		<div class="segment-preview-container">
+			<div class="segment-preview">
+				<canvas
+					id="shader-canvas"
+					style="display: block; max-width: 100%;"
+				></canvas>
+				<img
+					src={ imageSrc }
+					alt={ data.Entry.ImageID }
+					onerror="this.src='/static/placeholder.svg'"
+					style="display: none;"
+					id="shader-source-image"
+					crossorigin="anonymous"
+				/>
+			</div>
+			<div class="shader-selector">
+				<div class="shader-label">Shader Effect</div>
+				<div class="shader-controls">
+					<div class="shader-options">
+						for _, shader := range types.ShaderOptions() {
+							<button
+								class={ "shader-option", templ.KV("selected", data.Entry.Shader == string(shader.Value)) }
+								data-shader={ string(shader.Value) }
+								title={ shader.Label }
+								data-index={ fmt.Sprintf("%d", data.Index) }
+							>
+								<span class="shader-ball" style={ "background-color:" + shader.Color }></span>
+								<span class="shader-name">{ shader.Label }</span>
+							</button>
+						}
+					</div>
+					<button
+						class="shader-play-btn btn btn-secondary"
+						id="shader-play-btn"
+						data-index={ fmt.Sprintf("%d", data.Index) }
+						title="Play/Pause Animation"
+					>
+						▶
+					</button>
+				</div>
+			</div>
 		</div>
-		
+		<script type="module">
+			document.querySelectorAll('.shader-option').forEach(btn => {
+				btn.addEventListener('click', function() {
+					const shader = this.dataset.shader;
+					const idx = parseInt(this.dataset.index);
+					selectShader(idx, shader);
+				});
+			});
+			document.getElementById('shader-play-btn').addEventListener('click', function() {
+				const idx = parseInt(this.dataset.index);
+				toggleShaderAnimation(idx);
+			});
+		</script>
 		<div class="segment-info">
 			<div class="label">Time Range</div>
 			<div class="value">
 				{ fmt.Sprintf("%.3fs - %.3fs (%.1fs)", data.Entry.Start, data.Entry.End, duration) }
 			</div>
 		</div>
-		
 		<div class="segment-info">
 			<div class="label">Current Image</div>
 			<div class="value">{ data.Entry.ImageID }</div>
 		</div>
-		
 		<div class="segment-info">
 			<div class="label">Confidence</div>
 			<div class={ "value", confidenceClass }>
 				{ fmt.Sprintf("%.0f%%", confidence*100) }
 			</div>
 		</div>
-		
 		if data.Entry.Reason != "" {
 			<div class="segment-info">
 				<div class="label">Selection Reason</div>
 				<div class="transcript-text">{ data.Entry.Reason }</div>
 			</div>
 		}
-		
 		if data.Transcript != "" {
 			<div class="segment-info">
 				<div class="label">Audio Content</div>
 				<div class="transcript-text">{ data.Transcript }</div>
 			</div>
 		}
-		
 		<div class="segment-actions">
-			<button 
+			<button
 				class="btn btn-secondary"
 				onclick="playSegment()"
 			>
 				▶ Play Segment
 			</button>
-			<button 
+			<button
 				class="btn btn-primary"
 				hx-post={ fmt.Sprintf("/api/segment/%d/split", data.Index) }
 				hx-target="#timeline-container"
@@ -86,7 +129,7 @@ templ SegmentEditor(data SegmentData) {
 			>
 				➗ Split at Midpoint
 			</button>
-			<button 
+			<button
 				class="btn btn-secondary"
 				hx-post={ fmt.Sprintf("/api/segment/%d/merge", data.Index) }
 				hx-target="#timeline-container"

@@ -94,6 +94,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/api/images/html", s.handleImagesHTML)
 	s.mux.HandleFunc("/api/ws/progress", s.handleWebSocket)
 	s.mux.HandleFunc("/api/project/delete", s.handleDeleteProject)
+	s.mux.HandleFunc("/api/shaders/", s.handleShaders)
+	s.mux.HandleFunc("/api/shaders", s.handleShaders)
 }
 
 func (s *Server) Start() error {
@@ -538,6 +540,65 @@ func (s *Server) handleSegmentOperation(w http.ResponseWriter, r *http.Request, 
 
 		timeline.Entries[index].ImageID = req.ImageID
 		timeline.Entries[index].Image = filepath.Join(s.config.ImagesDir, req.ImageID)
+
+		if err := s.db.Queries.ClearTimeline(r.Context(), s.workDir.ProjectID()); err != nil {
+			http.Error(w, fmt.Sprintf("Failed to clear timeline: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if err := s.db.SaveTimeline(r.Context(), s.workDir.ProjectID(), timeline); err != nil {
+			http.Error(w, fmt.Sprintf("Failed to save timeline: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		if r.Header.Get("HX-Request") == "true" {
+			transcriptText := ""
+			transcript, err := s.db.GetFullTranscript(r.Context(), s.workDir.ProjectID())
+			if err == nil {
+				var texts []string
+				for _, seg := range transcript.Segments {
+					if seg.End > timeline.Entries[index].Start && seg.Start < timeline.Entries[index].End {
+						texts = append(texts, seg.Text)
+					}
+				}
+				transcriptText = strings.Join(texts, " ")
+			}
+
+			data := views.SegmentData{
+				Index:       index,
+				Entry:       timeline.Entries[index],
+				Transcript:  transcriptText,
+				ProjectName: s.currentProject,
+			}
+			component := views.SegmentEditor(data)
+			if err := component.Render(r.Context(), w); err != nil {
+				log.Printf("Error rendering segment editor: %v", err)
+			}
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(timeline.Entries[index]); err != nil {
+				log.Printf("Error encoding entry: %v", err)
+			}
+		}
+
+	case "shader":
+		shader := r.URL.Query().Get("shader")
+		if shader == "" {
+			var req struct {
+				Shader string `json:"shader"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+				return
+			}
+			shader = req.Shader
+		}
+
+		if shader != "" && !config.IsValidShader(shader) {
+			http.Error(w, fmt.Sprintf("Invalid shader: %s", shader), http.StatusBadRequest)
+			return
+		}
+
+		timeline.Entries[index].Shader = shader
 
 		if err := s.db.Queries.ClearTimeline(r.Context(), s.workDir.ProjectID()); err != nil {
 			http.Error(w, fmt.Sprintf("Failed to clear timeline: %v", err), http.StatusInternalServerError)
@@ -1147,4 +1208,44 @@ func isImageFileForDelete(path string) bool {
 	default:
 		return false
 	}
+}
+
+func (s *Server) handleShaders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/shaders")
+
+	if path == "" || path == "/" {
+		shaders := types.ListShaders()
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(shaders); err != nil {
+			log.Printf("Error encoding shaders: %v", err)
+		}
+		return
+	}
+
+	shaderName := strings.TrimPrefix(path, "/")
+
+	if shaderName == "vertex" {
+		content, err := types.GetVertexShader()
+		if err != nil {
+			http.Error(w, "Shader not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte(content))
+		return
+	}
+
+	content, err := types.GetShader(types.ShaderType(shaderName))
+	if err != nil {
+		http.Error(w, "Shader not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(content))
 }
