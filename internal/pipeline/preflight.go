@@ -28,12 +28,12 @@ func Preflight(cfg *config.Config, wd *workdir.WorkDir) error {
 	}
 	fmt.Println("  ✓ ffprobe found")
 
-	// Check whisper.cpp (try common names)
+	// Check whisper-ctranslate2
 	whisperBin := findWhisper()
 	if whisperBin == "" {
-		return fmt.Errorf("whisper.cpp not found in PATH (tried: whisper, whisper-cpp, main)")
+		return fmt.Errorf("whisper-ctranslate2 not found in PATH (tried: whisper-ctranslate2)")
 	}
-	fmt.Printf("  ✓ whisper.cpp found: %s\n", whisperBin)
+	fmt.Printf("  ✓ whisper-ctranslate2 found: %s\n", whisperBin)
 
 	// Check SubtitleEdit
 	subtitleEditBin := findSubtitleEdit()
@@ -107,7 +107,7 @@ func preflightLLM(cfg *config.Config, wd *workdir.WorkDir) error {
 }
 
 func findWhisper() string {
-	names := []string{"whisper", "whisper-cli", "whisper-cpp", "main", "whisper.exe", "main.exe"}
+	names := []string{"whisper-ctranslate2"}
 	for _, name := range names {
 		if path, err := exec.LookPath(name); err == nil {
 			return path

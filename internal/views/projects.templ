@@ -61,6 +61,18 @@ projects/
 								<div class="project-header">
 									<h3>{ project.Name }</h3>
 									<span class="project-date">{ project.ModifiedAt }</span>
+									<div class="project-menu">
+										<button class="menu-toggle" data-project={ project.Name }>
+											<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+												<circle cx="8" cy="3" r="1.5"/>
+												<circle cx="8" cy="8" r="1.5"/>
+												<circle cx="8" cy="13" r="1.5"/>
+											</svg>
+										</button>
+										<div class="menu-dropdown" id={ "menu-" + project.Name }>
+											<button class="menu-item delete-btn" data-project={ project.Name }>Delete Data</button>
+										</div>
+									</div>
 								</div>
 								<div class="project-details">
 									<div class="detail-item">
@@ -84,6 +96,54 @@ projects/
 					</div>
 				}
 			</main>
+			<script>
+				document.addEventListener('click', function(e) {
+					const toggles = document.querySelectorAll('.menu-toggle');
+					const dropdowns = document.querySelectorAll('.menu-dropdown');
+					
+					toggles.forEach(toggle => {
+						if (toggle.contains(e.target)) {
+							const projectName = toggle.getAttribute('data-project');
+							const dropdown = document.getElementById('menu-' + projectName);
+							dropdown.classList.toggle('show');
+						}
+					});
+					
+					dropdowns.forEach(dropdown => {
+						if (!dropdown.contains(e.target) && !e.target.closest('.menu-toggle')) {
+							dropdown.classList.remove('show');
+						}
+					});
+				});
+				
+				document.querySelectorAll('.delete-btn').forEach(btn => {
+					btn.addEventListener('click', async function(e) {
+						const projectName = this.getAttribute('data-project');
+						if (!confirm('Are you sure you want to delete all data for this project? This cannot be undone.')) {
+							return;
+						}
+						
+						const formData = new FormData();
+						formData.append('project', projectName);
+						
+						try {
+							const response = await fetch('/api/project/delete', {
+								method: 'POST',
+								body: formData
+							});
+							
+							if (response.ok) {
+								location.reload();
+							} else {
+								const error = await response.text();
+								alert('Failed to delete project: ' + error);
+							}
+						} catch (err) {
+							alert('Error deleting project: ' + err.message);
+						}
+					});
+				});
+			</script>
 		</body>
 	</html>
 }

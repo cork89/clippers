@@ -161,7 +161,7 @@ func DefaultConfig() *Config {
 		SubtitleMargin:     getEnvInt("CLIPPERS_SUBTITLE_MARGIN", 20),
 		DefaultImageWeight: getEnvFloat("CLIPPERS_DEFAULT_IMAGE_WEIGHT", 0.5),
 		TitleWeight:        getEnvString("CLIPPERS_TITLE_WEIGHT", "high"),
-		WhisperModel:       getEnvString("CLIPPERS_WHISPER_MODEL", "medium.en"),
+		WhisperModel:       getEnvString("CLIPPERS_WHISPER_MODEL", "distil-medium.en"),
 		LLMProvider:        LLMProvider(getEnvString("CLIPPERS_LLM_PROVIDER", string(LLMProviderOllama))),
 		OllamaHost:         getEnvString("CLIPPERS_OLLAMA_HOST", "http://localhost:11434"),
 		VisionModel:        getEnvString("CLIPPERS_VISION_MODEL", "gemma3:4b-it-qat"),

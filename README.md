@@ -8,8 +8,8 @@ Turn a 10-30 s audio clip and a small folder of images into a subtitled video
 ## What It Does
 
 1. **Transcribes** the audio locally (Whisper.cpp)  
-2. **Captions** every image with a vision LLM (Ollama `llava`)  
-3. **Matches** images to spoken content with a text LLM (Ollama `gemma3`)  
+2. **Captions** every image with a vision LLM (Ollama `gemma3` or openrouter `gpt5-nano`)  
+3. **Matches** images to spoken content with a text LLM (Ollama `gemma3` or openrouter `gpt5-nano`)  
 4. **Renders** three MP4s with:
    - Hard-cut edits (≥ 5 s per shot)  
    - Blurred background + centred foreground  
@@ -23,8 +23,9 @@ All intermediate files are cached; re-runs are instant if nothing changed.
 ## Install (Windows + NVIDIA)
 
 1. **Binaries** – add these to `PATH`:
-   - `ffmpeg` (including `ffprobe`)  
-   - `whisper.cpp` binary (CUDA build recommended)  
+   - `ffmpeg` (including `ffprobe`)
+   - `uv` installed
+   - `uv tool install whisper-ctranslate2` whisper-ctranslate2 installed
 
 2. **Ollama** – install once:
    ```bash
@@ -35,8 +36,7 @@ All intermediate files are cached; re-runs are instant if nothing changed.
 
 3. **Pull models** (one-time):
    ```bash
-   ollama pull llava:7b
-   ollama pull llama3.1:8b-instruct
+   ollama pull gemma3:4b-it-qat
    ```
 
 4. **clippers** – grab the latest release or build:
@@ -129,7 +129,7 @@ The prompts are hard-coded for the MVP. Edit these files if you need tighter cap
 ├── audio.wav           # 16 kHz mono
 ├── transcript.json     # whisper output
 ├── images/
-│   ├── captions.json   # llava results
+│   ├── captions.json   # vision model results
 ├── text/
 │   └── windows.json    # 5s windows
 ├── timeline.json       # final shot list
@@ -153,15 +153,6 @@ Delete `.work` or use `--force` to regenerate any stage.
 | Ollama unreachable | `ollama serve` must stay running in its own terminal |
 | CUDA OOM | use smaller whisper model (`base.en`) or reduce `--min-shot` to get fewer images |
 | subtitles off-screen | adjust `--font-size` or `--blur` values per aspect |
-
----
-
-## Road-map / Non-Goals
-
-**MVP (done)**  
-✔ local whisper, llava, gemma3 
-✔ 1:1 / 16:9 / 9:16 outputs  
-✔ hard cuts, blur background, centered image, bottom-center subs  
 
 ---
 

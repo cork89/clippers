@@ -2,14 +2,18 @@ package webserver
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -89,6 +93,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/api/timeline/html", s.handleTimelineHTML)
 	s.mux.HandleFunc("/api/images/html", s.handleImagesHTML)
 	s.mux.HandleFunc("/api/ws/progress", s.handleWebSocket)
+	s.mux.HandleFunc("/api/project/delete", s.handleDeleteProject)
 }
 
 func (s *Server) Start() error {
@@ -1001,5 +1006,145 @@ func (s *Server) handleProcessStatus(w http.ResponseWriter, r *http.Request) {
 	component := views.ProcessingStages(currentStage, s.processingProgress.failedStage, s.processingProgress.failedError)
 	if err := component.Render(r.Context(), w); err != nil {
 		log.Printf("Error rendering stages: %v", err)
+	}
+}
+
+func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Delete request received for project: %s", r.FormValue("project"))
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	projectName := r.FormValue("project")
+	if projectName == "" {
+		log.Printf("Delete failed: project name is empty")
+		http.Error(w, "Project name required", http.StatusBadRequest)
+		return
+	}
+
+	projectPath := filepath.Join(s.projectsDir, projectName)
+	log.Printf("Delete: project path = %s", projectPath)
+
+	projects, err := DiscoverProjects(s.projectsDir)
+	if err != nil {
+		log.Printf("Delete failed: DiscoverProjects error: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to find project: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	var foundProject *ProjectInfo
+	for i := range projects {
+		if projects[i].Name == projectName {
+			foundProject = &projects[i]
+			break
+		}
+	}
+
+	if foundProject == nil {
+		log.Printf("Delete failed: project not found in DiscoverProjects")
+		http.Error(w, "Project not found", http.StatusNotFound)
+		return
+	}
+
+	audioPath := filepath.Join(projectPath, foundProject.AudioFile)
+	imagesDir := foundProject.ImagesDir
+	log.Printf("Delete: audioPath = %s, imagesDir = %s", audioPath, imagesDir)
+
+	audioHash, err := hashFileForDelete(audioPath)
+	if err != nil {
+		log.Printf("Delete failed: hashFileForDelete error: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to hash audio: %v", err), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Delete: audioHash = %s", audioHash[:16])
+
+	imagesHash, err := hashDirectoryForDelete(imagesDir)
+	if err != nil {
+		log.Printf("Delete failed: hashDirectoryForDelete error: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to hash images: %v", err), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Delete: imagesHash = %s", imagesHash[:16])
+
+	log.Printf("Delete: MinShotSec = %.1f, BlurStrength = %d", s.config.MinShotSec, s.config.BlurStrength)
+
+	combined := fmt.Sprintf("%s:%s:%.1f:%d", audioHash[:16], imagesHash[:16], s.config.MinShotSec, s.config.BlurStrength)
+	log.Printf("Delete: combined string = %s", combined)
+	h := sha256.Sum256([]byte(combined))
+	projectID := hex.EncodeToString(h[:])[:16]
+	log.Printf("Delete: calculated projectID = %s", projectID)
+
+	if err := s.db.Queries.DeleteProject(r.Context(), projectID); err != nil {
+		log.Printf("Delete failed: DeleteProject error: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to delete project: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Delete: successfully deleted project %s", projectID)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "deleted"}); err != nil {
+		log.Printf("Error encoding response: %v", err)
+	}
+}
+
+func hashFileForDelete(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func hashDirectoryForDelete(dir string) (string, error) {
+	if dir == "" {
+		return "empty", nil
+	}
+
+	var files []string
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && isImageFileForDelete(path) {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	sort.Strings(files)
+
+	h := sha256.New()
+	for _, f := range files {
+		fileHash, err := hashFileForDelete(f)
+		if err != nil {
+			return "", err
+		}
+		h.Write([]byte(f + ":" + fileHash + "\n"))
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func isImageFileForDelete(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp":
+		return true
+	default:
+		return false
 	}
 }

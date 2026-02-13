@@ -29,27 +29,32 @@ func Transcribe(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, db
 
 	fmt.Println("==> Transcribing audio")
 
-	audioPath := wd.Path("audio.wav")
-	outputBase := wd.Path("transcript")
-
 	whisperBin := findWhisper()
 	if whisperBin == "" {
-		return nil, fmt.Errorf("whisper.cpp not found")
+		return nil, fmt.Errorf("whisper-ctranslate2 not found")
 	}
 
+	audioPath := wd.Path("audio.wav")
+	outputDir := wd.Path(".")
+
 	cmd := exec.Command(whisperBin,
-		"-m", findWhisperModel(cfg.WhisperModel),
-		"-f", audioPath,
-		"-osrt",
-		"-of", outputBase,
+		audioPath,
+		"--model", cfg.WhisperModel,
+		"--device", "cuda",
+		"--compute_type", "float16",
+		"--vad_filter", "True",
+		"--batched", "True",
+		"--batch_size", "16",
+		"--output_format", "srt",
+		"--output_dir", outputDir,
 	)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("whisper.cpp failed: %w\n%s", err, string(output))
+		return nil, fmt.Errorf("whisper-ctranslate2 failed: %w\n%s", err, string(output))
 	}
 
-	srtPath := outputBase + ".srt"
+	srtPath := filepath.Join(outputDir, "audio.srt")
 	transcript, err := parseSRT(srtPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse SRT: %w", err)
@@ -72,28 +77,6 @@ func Transcribe(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, db
 
 	fmt.Printf("  ✓ Transcribed %d segments (%.1fs)\n", len(transcript.Segments), duration)
 	return transcript, nil
-}
-
-func findWhisperModel(model string) string {
-	home := os.Getenv("HOME")
-	if home == "" {
-		home = os.Getenv("USERPROFILE")
-	}
-
-	locations := []string{
-		fmt.Sprintf("models/ggml-%s.bin", model),
-		fmt.Sprintf("ggml-%s.bin", model),
-		filepath.Join(home, ".cache", "whisper", fmt.Sprintf("ggml-%s.bin", model)),
-		filepath.Join(home, "whisper.cpp", "models", fmt.Sprintf("ggml-%s.bin", model)),
-	}
-
-	for _, loc := range locations {
-		if _, err := os.Stat(loc); err == nil {
-			return loc
-		}
-	}
-
-	return fmt.Sprintf("ggml-%s.bin", model)
 }
 
 func parseSRT(path string) (*types.Transcript, error) {

@@ -518,12 +518,12 @@ func init() {
 	runCmd.Flags().IntVar(&cfg.BlurStrength, "blur", cfg.BlurStrength, "Background blur strength")
 	runCmd.Flags().IntVar(&cfg.FontSize, "font-size", cfg.FontSize, "Base subtitle font size")
 	runCmd.Flags().Float64Var(&cfg.DefaultImageWeight, "default-threshold", 0.5, "Confidence threshold below which default image is used")
-	runCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
+	runCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "distil-medium.en", "Whisper model name")
 
 	captionCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
 
 	transcribeCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
-	transcribeCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
+	transcribeCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "distil-medium.en", "Whisper model name")
 
 	previewCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")
 	previewCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (required)")
@@ -542,7 +542,7 @@ func init() {
 	planCmd.Flags().StringVarP(&cfg.Title, "title", "t", "", "Video title (used for image selection context)")
 	planCmd.Flags().Float64Var(&cfg.MinShotSec, "min-shot", 5, "Minimum shot duration in seconds")
 	planCmd.Flags().Float64Var(&cfg.DefaultImageWeight, "default-threshold", 0.5, "Confidence threshold for default image")
-	planCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
+	planCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "distil-medium.en", "Whisper model name")
 
 	serverCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (optional if using --projects-dir)")
 	serverCmd.Flags().StringVarP(&cfg.ImagesDir, "images", "i", "", "Path to images directory (optional if using --projects-dir)")
@@ -551,7 +551,7 @@ func init() {
 	serverCmd.Flags().IntVarP(&serverPort, "port", "p", 8080, "Server port")
 	serverCmd.Flags().Float64Var(&cfg.MinShotSec, "min-shot", 5, "Minimum shot duration in seconds")
 	serverCmd.Flags().Float64Var(&cfg.DefaultImageWeight, "default-threshold", 0.5, "Confidence threshold for default image")
-	serverCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "medium.en", "Whisper model name")
+	serverCmd.Flags().StringVar(&cfg.WhisperModel, "whisper-model", "distil-medium.en", "Whisper model name")
 
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(captionCmd)
