@@ -9,9 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/cork89/clippers/internal/config"
 	"github.com/cork89/clippers/internal/database"
+	"github.com/cork89/clippers/internal/types"
 )
 
 type WorkDir struct {
@@ -56,6 +58,27 @@ func New(ctx context.Context, cfg *config.Config, db *database.DB) (*WorkDir, er
 
 	if err := db.CreateProject(ctx, hash, cfg.AudioPath, cfg.ImagesDir, cfg.OutputDir, audioHash, imagesHash, settings); err != nil {
 		return nil, fmt.Errorf("failed to create project in database: %w", err)
+	}
+
+	projectSettings := &types.ProjectSettings{
+		ProjectID:          hash,
+		Shader:             string(cfg.Shader),
+		FPS:                cfg.FPS,
+		Aspects:            strings.Join(cfg.Aspects, ","),
+		FontSize:           cfg.FontSize,
+		SubtitleMargin:     cfg.SubtitleMargin,
+		MinShotSec:         cfg.MinShotSec,
+		MaxWords:           cfg.MaxWords,
+		DefaultImageWeight: cfg.DefaultImageWeight,
+		TitleWeight:        cfg.TitleWeight,
+		BlurStrength:       cfg.BlurStrength,
+		WhisperModel:       cfg.WhisperModel,
+		VisionModel:        cfg.VisionModel,
+		SelectModel:        cfg.SelectModel,
+	}
+
+	if err := db.SaveProjectSettings(ctx, projectSettings); err != nil {
+		return nil, fmt.Errorf("failed to save project settings: %w", err)
 	}
 
 	return wd, nil

@@ -43,7 +43,7 @@ func ListShaders() []ShaderType {
 	entries, _ := shadersFS.ReadDir("shaders")
 	var shaders []ShaderType
 	for _, e := range entries {
-		if !e.IsDir() && hasSuffix(e.Name(), "_browser.glsl") {
+		if !e.IsDir() && hasSuffix(e.Name(), "_browser.glsl") {`
 			name := stripSuffix(e.Name(), "_browser.glsl")
 			shaders = append(shaders, ShaderType(name))
 		}
@@ -97,7 +97,24 @@ type TimelineEntry struct {
 	Image      string  `json:"image_path"`
 	Confidence float64 `json:"confidence,omitempty"`
 	Reason     string  `json:"reason,omitempty"`
-	Shader     string  `json:"shader,omitempty"`
+}
+
+// ProjectSettings represents project-level settings stored in the database
+type ProjectSettings struct {
+	ProjectID          string  `json:"project_id"`
+	Shader             string  `json:"shader"`
+	FPS                int     `json:"fps"`
+	Aspects            string  `json:"aspects"`
+	FontSize           int     `json:"font_size"`
+	SubtitleMargin     int     `json:"subtitle_margin"`
+	MinShotSec         float64 `json:"min_shot_sec"`
+	MaxWords           int     `json:"max_words"`
+	DefaultImageWeight float64 `json:"default_image_weight"`
+	TitleWeight        string  `json:"title_weight"`
+	BlurStrength       int     `json:"blur_strength"`
+	WhisperModel       string  `json:"whisper_model"`
+	VisionModel        string  `json:"vision_model"`
+	SelectModel        string  `json:"select_model"`
 }
 
 // Timeline is the full video timeline

@@ -292,6 +292,39 @@ var renderCmd = &cobra.Command{
 			return err
 		}
 
+		if settings, err := db.GetProjectSettings(context.Background(), wd.ProjectID()); err == nil && settings != nil {
+			if shaderFlag == "" && settings.Shader != "" {
+				cfg.Shader = types.ShaderType(settings.Shader)
+			}
+			if settings.FPS > 0 {
+				cfg.FPS = settings.FPS
+			}
+			if settings.FontSize > 0 {
+				cfg.FontSize = settings.FontSize
+			}
+			if settings.SubtitleMargin > 0 {
+				cfg.SubtitleMargin = settings.SubtitleMargin
+			}
+			if settings.MinShotSec > 0 {
+				cfg.MinShotSec = settings.MinShotSec
+			}
+			if settings.MaxWords > 0 {
+				cfg.MaxWords = settings.MaxWords
+			}
+			if settings.DefaultImageWeight > 0 {
+				cfg.DefaultImageWeight = settings.DefaultImageWeight
+			}
+			if settings.TitleWeight != "" {
+				cfg.TitleWeight = settings.TitleWeight
+			}
+			if settings.BlurStrength > 0 {
+				cfg.BlurStrength = settings.BlurStrength
+			}
+			if settings.Aspects != "" {
+				cfg.Aspects = strings.Split(settings.Aspects, ",")
+			}
+		}
+
 		subtitleAspects := make([]types.SubtitleAspect, 0)
 
 		for _, aspect := range cfg.Aspects {

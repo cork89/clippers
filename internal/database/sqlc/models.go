@@ -30,6 +30,25 @@ type Project struct {
 	CreatedAt  sql.NullTime   `json:"created_at"`
 }
 
+type ProjectSetting struct {
+	ProjectID          string          `json:"project_id"`
+	Shader             sql.NullString  `json:"shader"`
+	Fps                sql.NullInt64   `json:"fps"`
+	Aspects            sql.NullString  `json:"aspects"`
+	FontSize           sql.NullInt64   `json:"font_size"`
+	SubtitleMargin     sql.NullInt64   `json:"subtitle_margin"`
+	MinShotSec         sql.NullFloat64 `json:"min_shot_sec"`
+	MaxWords           sql.NullInt64   `json:"max_words"`
+	DefaultImageWeight sql.NullFloat64 `json:"default_image_weight"`
+	TitleWeight        sql.NullString  `json:"title_weight"`
+	BlurStrength       sql.NullInt64   `json:"blur_strength"`
+	WhisperModel       sql.NullString  `json:"whisper_model"`
+	VisionModel        sql.NullString  `json:"vision_model"`
+	SelectModel        sql.NullString  `json:"select_model"`
+	CreatedAt          sql.NullTime    `json:"created_at"`
+	UpdatedAt          sql.NullTime    `json:"updated_at"`
+}
+
 type Segment struct {
 	ID        int64   `json:"id"`
 	ProjectID string  `json:"project_id"`

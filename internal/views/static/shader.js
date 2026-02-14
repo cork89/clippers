@@ -377,17 +377,22 @@ document.addEventListener('htmx:afterSwap', (event) => {
   const editorContent = event.target.closest('#editor-panel-content');
   if (!editorContent) return;
   
-  const canvas = editorContent.querySelector('.segment-preview canvas');
-  const img = editorContent.querySelector('.segment-preview img');
-  if (!canvas || !img) return;
+  const img = editorContent.querySelector('#segment-preview-image');
+  if (!img) return;
   
-  // Get shader from selected button
-  const selectedBtn = editorContent.querySelector('.shader-option.selected');
-  const shader = selectedBtn ? selectedBtn.dataset.shader : 'none';
+  // Get shader from data attribute (set from project settings)
+  const shader = editorContent.dataset.shader || 'none';
   
-  // Only initialize if not already done
-  if (!shaderPreviews[0]) {
+  // Initialize shader preview if shader is not 'none'
+  if (shader && shader !== 'none' && !shaderPreviews[0]) {
     initShaderPreview(0, 'shader-canvas', img.src, shader);
+    
+    // Show canvas, hide original image
+    const canvas = editorContent.querySelector('#shader-canvas');
+    if (canvas) {
+      canvas.style.display = 'block';
+      img.style.display = 'none';
+    }
   }
 });
 

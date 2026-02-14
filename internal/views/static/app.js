@@ -21,7 +21,6 @@ if (typeof segmentEndTime === 'undefined') {
 }
 
 function playSegment() {
-  clearTimeout(currentAudioTimeout)
   const audio = document.getElementById('global-audio');
   const startInput = document.getElementById('segment-start');
   const endInput = document.getElementById('segment-end');
@@ -33,11 +32,21 @@ function playSegment() {
   
   if (isNaN(startTime) || isNaN(endTime)) return;
   
+  clearTimeout(currentAudioTimeout);
+  
+  audio.pause();
   audio.currentTime = startTime;
-  audio.play();
-  currentAudioTimeout = setTimeout(() => {
-    audio.pause()
-  }, (endTime-startTime)*1000)
+  
+  const playPromise = audio.play();
+  if (playPromise !== undefined) {
+    playPromise.then(() => {
+      currentAudioTimeout = setTimeout(() => {
+        audio.pause();
+      }, (endTime-startTime)*1000);
+    }).catch(err => {
+      console.error('Play failed:', err);
+    });
+  }
 }
 
 // Show audio player when page loads

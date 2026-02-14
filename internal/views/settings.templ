@@ -1,0 +1,181 @@
+// ./internal/views/settings.templ
+package views
+
+import (
+	"fmt"
+
+	"github.com/cork89/clippers/internal/types"
+)
+
+// SettingsData holds data for rendering the settings modal
+type SettingsData struct {
+	ProjectName string
+	Settings    *types.ProjectSettings
+}
+
+// ProjectSettingsModal renders the project settings modal
+templ ProjectSettingsModal(data SettingsData) {
+	<div id="settings-modal" class="modal hidden">
+		<div class="modal-content settings-modal">
+			<div class="modal-header">
+				<h3>Project Settings</h3>
+				<button class="modal-close" onclick="closeSettingsModal()">×</button>
+			</div>
+			<div class="modal-body">
+				<form id="settings-form" class="settings-form">
+					<div class="settings-section">
+						<h4>Video</h4>
+						<div class="form-group">
+							<label for="settings-shader" class="form-label">Shader Effect</label>
+							<select id="settings-shader" name="shader" class="form-select" onchange="previewShaderOnEditor(this.value)">
+								for _, shader := range types.ShaderOptions() {
+									<option
+										value={ string(shader.Value) }
+										selected={ data.Settings != nil && data.Settings.Shader == string(shader.Value) }
+									>
+										{ shader.Label }
+									</option>
+								}
+							</select>
+						</div>
+						<div class="form-group">
+							<label for="settings-aspects" class="form-label">Aspect Ratios</label>
+							<div class="form-multi-select" id="aspects-multi-select">
+								<div class="multi-select-container" onclick="toggleAspectsDropdown()">
+									<span class="multi-select-placeholder">Select aspect ratios...</span>
+								</div>
+								<div class="multi-select-dropdown" id="aspects-dropdown">
+									<div class="multi-select-option" data-value="1x1" onclick="toggleAspect('1x1')">
+										<span>1:1 (Square)</span>
+										<span class="check-icon">✓</span>
+									</div>
+									<div class="multi-select-option" data-value="16x9" onclick="toggleAspect('16x9')">
+										<span>16:9 (Landscape)</span>
+										<span class="check-icon">✓</span>
+									</div>
+									<div class="multi-select-option" data-value="9x16" onclick="toggleAspect('9x16')">
+										<span>9:16 (Portrait)</span>
+										<span class="check-icon">✓</span>
+									</div>
+								</div>
+							</div>
+							<input type="hidden" id="settings-aspects" name="aspects" value={ getAspects(data.Settings) }/>
+						</div>
+					</div>
+					<div class="settings-section">
+						<h4>Subtitles</h4>
+						<div class="settings-form-row">
+							<div class="form-group">
+								<label for="settings-font-size" class="form-label">Font Size</label>
+								<input
+									type="number"
+									id="settings-font-size"
+									name="font_size"
+									class="form-input"
+									value={ fmt.Sprintf("%d", getFontSize(data.Settings)) }
+									min="10"
+									max="200"
+								/>
+							</div>
+							<div class="form-group">
+								<label for="settings-subtitle-margin" class="form-label">Subtitle Margin</label>
+								<input
+									type="number"
+									id="settings-subtitle-margin"
+									name="subtitle_margin"
+									class="form-input"
+									value={ fmt.Sprintf("%d", getSubtitleMargin(data.Settings)) }
+									min="0"
+									max="200"
+								/>
+							</div>
+						</div>
+					</div>
+					<div class="settings-section">
+						<h4>Effects</h4>
+						<div class="form-group">
+							<label for="settings-blur" class="form-label">Blur Strength</label>
+							<div class="slider-container">
+								<input
+									type="range"
+									id="settings-blur"
+									name="blur_strength"
+									class="form-input"
+									value={ fmt.Sprintf("%d", getBlurStrength(data.Settings)) }
+									min="0"
+									max="50"
+									oninput="updateSliderValue(this)"
+								/>
+								<span class="slider-value" id="blur-value">{ fmt.Sprintf("%d", getBlurStrength(data.Settings)) }</span>
+							</div>
+						</div>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button class="btn btn-secondary" onclick="closeSettingsModal()">Cancel</button>
+				<button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+			</div>
+		</div>
+	</div>
+	<script>
+		// Initialize aspects multi-select after modal is loaded
+		initAspectsFromValue(document.getElementById('settings-aspects')?.value || '1x1,16x9,9x16');
+	</script>
+}
+
+func getFPS(s *types.ProjectSettings) int {
+	if s == nil || s.FPS == 0 {
+		return 24
+	}
+	return s.FPS
+}
+
+func getAspects(s *types.ProjectSettings) string {
+	if s == nil || s.Aspects == "" {
+		return "1x1,16x9,9x16"
+	}
+	return s.Aspects
+}
+
+func getFontSize(s *types.ProjectSettings) int {
+	if s == nil || s.FontSize == 0 {
+		return 60
+	}
+	return s.FontSize
+}
+
+func getSubtitleMargin(s *types.ProjectSettings) int {
+	if s == nil || s.SubtitleMargin == 0 {
+		return 20
+	}
+	return s.SubtitleMargin
+}
+
+func getMinShotSec(s *types.ProjectSettings) float64 {
+	if s == nil || s.MinShotSec == 0 {
+		return 5.0
+	}
+	return s.MinShotSec
+}
+
+func getMaxWords(s *types.ProjectSettings) int {
+	if s == nil || s.MaxWords == 0 {
+		return 5
+	}
+	return s.MaxWords
+}
+
+func getBlurStrength(s *types.ProjectSettings) int {
+	if s == nil || s.BlurStrength == 0 {
+		return 20
+	}
+	return s.BlurStrength
+}
+
+// SettingsButton renders the settings button
+templ SettingsButton() {
+	<button id="settings-btn" class="btn btn-secondary" onclick="openSettingsModal()">
+		⚙️ Settings
+	</button>
+}

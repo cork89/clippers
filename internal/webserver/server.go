@@ -80,6 +80,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/projects/", s.handleProjectPage)
 	s.mux.HandleFunc("/api/projects", s.handleProjectsList)
 	s.mux.HandleFunc("/api/project", s.handleProject)
+	s.mux.HandleFunc("/api/project/settings", s.handleProjectSettings)
+	s.mux.HandleFunc("/api/settings/modal", s.handleSettingsModal)
 	s.mux.HandleFunc("/api/save", s.handleSave)
 	s.mux.HandleFunc("/api/process", s.handleProcess)
 	s.mux.HandleFunc("/api/process/status", s.handleProcessStatus)
@@ -270,6 +272,85 @@ func (s *Server) handleProject(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(project); err != nil {
 		log.Printf("Error encoding project: %v", err)
+	}
+}
+
+func (s *Server) handleProjectSettings(w http.ResponseWriter, r *http.Request) {
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		settings, err := s.db.GetProjectSettings(r.Context(), s.workDir.ProjectID())
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to read settings: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if settings == nil {
+			settings = &types.ProjectSettings{
+				ProjectID: s.workDir.ProjectID(),
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(settings); err != nil {
+			log.Printf("Error encoding settings: %v", err)
+		}
+	case http.MethodPut:
+		var settings types.ProjectSettings
+		if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
+			http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+			return
+		}
+		settings.ProjectID = s.workDir.ProjectID()
+
+		if err := s.db.SaveProjectSettings(r.Context(), &settings); err != nil {
+			http.Error(w, fmt.Sprintf("Failed to save settings: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "saved"}); err != nil {
+			log.Printf("Error encoding response: %v", err)
+		}
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleSettingsModal(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
+	settings, err := s.db.GetProjectSettings(r.Context(), s.workDir.ProjectID())
+	if err != nil {
+		log.Printf("Failed to read settings: %v", err)
+		settings = &types.ProjectSettings{
+			ProjectID: s.workDir.ProjectID(),
+		}
+	}
+	if settings == nil {
+		settings = &types.ProjectSettings{
+			ProjectID: s.workDir.ProjectID(),
+		}
+	}
+
+	data := views.SettingsData{
+		ProjectName: s.workDir.ProjectID(),
+		Settings:    settings,
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	if err := views.ProjectSettingsModal(data).Render(r.Context(), w); err != nil {
+		log.Printf("Error rendering settings modal: %v", err)
 	}
 }
 
@@ -483,11 +564,18 @@ func (s *Server) getSegment(w http.ResponseWriter, r *http.Request, segmentID st
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
+		shader := "none"
+		settings, err := s.db.GetProjectSettings(r.Context(), s.workDir.ProjectID())
+		if err == nil && settings != nil {
+			shader = settings.Shader
+		}
+
 		data := views.SegmentData{
 			Index:       index,
 			Entry:       entry,
 			Transcript:  transcriptText,
 			ProjectName: s.currentProject,
+			Shader:      shader,
 		}
 		component := views.SegmentEditor(data)
 		if err := component.Render(r.Context(), w); err != nil {
@@ -563,63 +651,10 @@ func (s *Server) handleSegmentOperation(w http.ResponseWriter, r *http.Request, 
 				transcriptText = strings.Join(texts, " ")
 			}
 
-			data := views.SegmentData{
-				Index:       index,
-				Entry:       timeline.Entries[index],
-				Transcript:  transcriptText,
-				ProjectName: s.currentProject,
-			}
-			component := views.SegmentEditor(data)
-			if err := component.Render(r.Context(), w); err != nil {
-				log.Printf("Error rendering segment editor: %v", err)
-			}
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(timeline.Entries[index]); err != nil {
-				log.Printf("Error encoding entry: %v", err)
-			}
-		}
-
-	case "shader":
-		shader := r.URL.Query().Get("shader")
-		if shader == "" {
-			var req struct {
-				Shader string `json:"shader"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
-				return
-			}
-			shader = req.Shader
-		}
-
-		if shader != "" && !config.IsValidShader(shader) {
-			http.Error(w, fmt.Sprintf("Invalid shader: %s", shader), http.StatusBadRequest)
-			return
-		}
-
-		timeline.Entries[index].Shader = shader
-
-		if err := s.db.Queries.ClearTimeline(r.Context(), s.workDir.ProjectID()); err != nil {
-			http.Error(w, fmt.Sprintf("Failed to clear timeline: %v", err), http.StatusInternalServerError)
-			return
-		}
-		if err := s.db.SaveTimeline(r.Context(), s.workDir.ProjectID(), timeline); err != nil {
-			http.Error(w, fmt.Sprintf("Failed to save timeline: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		if r.Header.Get("HX-Request") == "true" {
-			transcriptText := ""
-			transcript, err := s.db.GetFullTranscript(r.Context(), s.workDir.ProjectID())
-			if err == nil {
-				var texts []string
-				for _, seg := range transcript.Segments {
-					if seg.End > timeline.Entries[index].Start && seg.Start < timeline.Entries[index].End {
-						texts = append(texts, seg.Text)
-					}
-				}
-				transcriptText = strings.Join(texts, " ")
+			shader := "none"
+			settings, err := s.db.GetProjectSettings(r.Context(), s.workDir.ProjectID())
+			if err == nil && settings != nil {
+				shader = settings.Shader
 			}
 
 			data := views.SegmentData{
@@ -627,6 +662,7 @@ func (s *Server) handleSegmentOperation(w http.ResponseWriter, r *http.Request, 
 				Entry:       timeline.Entries[index],
 				Transcript:  transcriptText,
 				ProjectName: s.currentProject,
+				Shader:      shader,
 			}
 			component := views.SegmentEditor(data)
 			if err := component.Render(r.Context(), w); err != nil {

@@ -47,6 +47,35 @@ CREATE TABLE text_windows (
     ordinal INTEGER NOT NULL
 );
 
+CREATE TABLE project_settings (
+    project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+    
+    -- Video settings
+    shader TEXT DEFAULT 'none',
+    fps INTEGER DEFAULT 24,
+    aspects TEXT DEFAULT '1x1,16x9,9x16',
+    
+    -- Subtitle settings
+    font_size INTEGER DEFAULT 60,
+    subtitle_margin INTEGER DEFAULT 20,
+    
+    -- Planning settings
+    min_shot_sec REAL DEFAULT 5.0,
+    max_words INTEGER DEFAULT 5,
+    default_image_weight REAL DEFAULT 0.5,
+    title_weight TEXT DEFAULT 'high',
+    blur_strength INTEGER DEFAULT 20,
+    
+    -- LLM settings
+    whisper_model TEXT DEFAULT 'distil-medium.en',
+    vision_model TEXT,
+    select_model TEXT,
+    
+    -- Metadata
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE timeline_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

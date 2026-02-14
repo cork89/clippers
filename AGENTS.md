@@ -143,10 +143,42 @@ internal/
   ollama/             # Ollama API client
   pipeline/           # Video processing pipeline stages
   types/              # Shared type definitions
+  views/              # HTML templates (Templ)
   workdir/            # Working directory management
 assets/               # Embedded assets (fonts)
 shaders/              # Shader files for video effects
 ```
+
+## Views / Templ Files
+
+The `internal/views/` directory contains all HTML templates using the Templ Go library.
+
+### File Organization
+
+- `layout.templ` - Main page layouts (HTML shell, header, footer, modals that persist across pages)
+- `*.templ` - Individual page/component templates (e.g., `settings.templ`, `segment.templ`, `timeline.templ`)
+
+### Key Principle: Don't Duplicate Modal HTML
+
+**Modals that need dynamic content should be loaded via HTMX, NOT embedded in layout.templ.**
+
+Correct approach:
+1. `layout.templ` contains a placeholder: `<div id="modal-container" hx-get="/api/modal" hx-trigger="load"></div>`
+2. The corresponding `*.templ` file defines the full modal with server-side data binding
+3. Server endpoint serves the modal component via HTMX
+
+Incorrect approach:
+- Copy-pasting modal HTML into both `layout.templ` AND `settings.templ` - this causes duplication and makes maintenance difficult
+
+### Generated Files
+
+Templ generates `*_templ.go` files automatically. **Do not edit generated files directly.** Run `templ generate` after modifying `.templ` files.
+
+### Adding New Pages/Components
+
+1. Create or update the `.templ` file in `internal/views/`
+2. Run `templ generate`
+3. Use the component in Go code: `views.ComponentName(data)`
 
 ## Dependencies
 

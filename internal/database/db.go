@@ -101,6 +101,35 @@ CREATE TABLE IF NOT EXISTS text_windows (
     ordinal INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS project_settings (
+    project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+    
+    -- Video settings
+    shader TEXT DEFAULT 'none',
+    fps INTEGER DEFAULT 24,
+    aspects TEXT DEFAULT '1x1,16x9,9x16',
+    
+    -- Subtitle settings
+    font_size INTEGER DEFAULT 60,
+    subtitle_margin INTEGER DEFAULT 20,
+    
+    -- Planning settings
+    min_shot_sec REAL DEFAULT 5.0,
+    max_words INTEGER DEFAULT 5,
+    default_image_weight REAL DEFAULT 0.5,
+    title_weight TEXT DEFAULT 'high',
+    blur_strength INTEGER DEFAULT 20,
+    
+    -- LLM settings
+    whisper_model TEXT DEFAULT 'distil-medium.en',
+    vision_model TEXT,
+    select_model TEXT,
+    
+    -- Metadata
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS timeline_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -389,10 +418,6 @@ func (db *DB) SaveTimeline(ctx context.Context, projectID string, timeline *type
 				String: e.Reason,
 				Valid:  e.Reason != "",
 			},
-			Shader: sql.NullString{
-				String: e.Shader,
-				Valid:  e.Shader != "",
-			},
 			Ordinal: int64(i),
 		}); err != nil {
 			return err
@@ -419,7 +444,6 @@ func (db *DB) GetTimeline(ctx context.Context, projectID string) (*types.Timelin
 			Image:      e.ImagePath,
 			Confidence: e.Confidence.Float64,
 			Reason:     e.Reason.String,
-			Shader:     e.Shader.String,
 		}
 	}
 
@@ -431,4 +455,91 @@ func boolToInt64(b bool) int64 {
 		return 1
 	}
 	return 0
+}
+
+func (db *DB) GetProjectSettings(ctx context.Context, projectID string) (*types.ProjectSettings, error) {
+	settings, err := db.Queries.GetProjectSettings(ctx, projectID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	result := &types.ProjectSettings{
+		ProjectID:          settings.ProjectID,
+		Shader:             settings.Shader.String,
+		FPS:                int(settings.Fps.Int64),
+		Aspects:            settings.Aspects.String,
+		FontSize:           int(settings.FontSize.Int64),
+		SubtitleMargin:     int(settings.SubtitleMargin.Int64),
+		MinShotSec:         settings.MinShotSec.Float64,
+		MaxWords:           int(settings.MaxWords.Int64),
+		DefaultImageWeight: settings.DefaultImageWeight.Float64,
+		TitleWeight:        settings.TitleWeight.String,
+		BlurStrength:       int(settings.BlurStrength.Int64),
+		WhisperModel:       settings.WhisperModel.String,
+		VisionModel:        settings.VisionModel.String,
+		SelectModel:        settings.SelectModel.String,
+	}
+
+	return result, nil
+}
+
+func (db *DB) SaveProjectSettings(ctx context.Context, settings *types.ProjectSettings) error {
+	return db.Queries.UpsertProjectSettings(ctx, sqlc.UpsertProjectSettingsParams{
+		ProjectID: settings.ProjectID,
+		Shader: sql.NullString{
+			String: settings.Shader,
+			Valid:  settings.Shader != "",
+		},
+		Fps: sql.NullInt64{
+			Int64: int64(settings.FPS),
+			Valid: settings.FPS > 0,
+		},
+		Aspects: sql.NullString{
+			String: settings.Aspects,
+			Valid:  settings.Aspects != "",
+		},
+		FontSize: sql.NullInt64{
+			Int64: int64(settings.FontSize),
+			Valid: settings.FontSize > 0,
+		},
+		SubtitleMargin: sql.NullInt64{
+			Int64: int64(settings.SubtitleMargin),
+			Valid: settings.SubtitleMargin > 0,
+		},
+		MinShotSec: sql.NullFloat64{
+			Float64: settings.MinShotSec,
+			Valid:   settings.MinShotSec > 0,
+		},
+		MaxWords: sql.NullInt64{
+			Int64: int64(settings.MaxWords),
+			Valid: settings.MaxWords > 0,
+		},
+		DefaultImageWeight: sql.NullFloat64{
+			Float64: settings.DefaultImageWeight,
+			Valid:   settings.DefaultImageWeight > 0,
+		},
+		TitleWeight: sql.NullString{
+			String: settings.TitleWeight,
+			Valid:  settings.TitleWeight != "",
+		},
+		BlurStrength: sql.NullInt64{
+			Int64: int64(settings.BlurStrength),
+			Valid: settings.BlurStrength > 0,
+		},
+		WhisperModel: sql.NullString{
+			String: settings.WhisperModel,
+			Valid:  settings.WhisperModel != "",
+		},
+		VisionModel: sql.NullString{
+			String: settings.VisionModel,
+			Valid:  settings.VisionModel != "",
+		},
+		SelectModel: sql.NullString{
+			String: settings.SelectModel,
+			Valid:  settings.SelectModel != "",
+		},
+	})
 }
