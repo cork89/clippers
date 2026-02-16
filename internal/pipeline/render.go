@@ -44,6 +44,12 @@ func Render(wd *workdir.WorkDir, cfg *config.Config, timeline *types.Timeline, s
 	fmt.Printf("  Resolution: %dx%d\n", aspectCfg.Width, aspectCfg.Height)
 	fmt.Printf("  Font size: %d, Margin: %d\n", aspectCfg.FontSize, aspectCfg.MarginV)
 
+	// Create render directory
+	renderDir := wd.Path("render")
+	if err := os.MkdirAll(renderDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create render directory: %w", err)
+	}
+
 	// Create concat file for ffmpeg
 	concatPath := wd.Path(fmt.Sprintf("render/concat_%s.txt", aspect))
 	if err := writeConcatFile(concatPath, timeline); err != nil {

@@ -1225,6 +1225,23 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
 			_, err = pipeline.PlanTimeline(r.Context(), s.workDir, s.config, s.db, windows, catalog, s.config.Force)
 			return err
 		}},
+		{"Generating subtitles", func() error {
+			transcript, err := s.db.GetFullTranscript(r.Context(), s.workDir.ProjectID())
+			if err != nil {
+				return err
+			}
+			timeline, err := s.db.GetTimeline(r.Context(), s.workDir.ProjectID())
+			if err != nil {
+				return err
+			}
+			_, err = pipeline.GenerateSubtitles(s.workDir, s.config, transcript, timeline, s.config.Force)
+			return err
+		}},
+		{"Converting subtitles", func() error {
+			srtPath := s.workDir.Path("subtitles.srt")
+			_, err := pipeline.ConvertAndProcessSubtitles(s.workDir, s.config, srtPath, s.config.Force)
+			return err
+		}},
 	}
 
 	for i := range stages {
