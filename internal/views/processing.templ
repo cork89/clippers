@@ -26,7 +26,6 @@ templ ProcessingPage(data ProcessingData) {
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="m7.848 8.25 1.536.887M7.848 8.25a3 3 0 1 1-5.196-3 3 3 0 0 1 5.196 3Zm1.536.887a2.165 2.165 0 0 1 1.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 1 1-5.196 3 3 3 0 0 1 5.196-3Zm1.536-.887a2.165 2.165 0 0 0 1.083-1.838c.005-.352.054-.695.14-1.025m-1.223 2.863 2.077-1.199m0-3.328a4.323 4.323 0 0 1 2.068-1.379l5.325-1.628a4.5 4.5 0 0 1 2.48-.044l.803.215-7.794 4.5m-2.882-1.664A4.33 4.33 0 0 0 10.607 12m3.736 0 7.794 4.5-.802.215a4.5 4.5 0 0 1-2.48-.043l-5.326-1.629a4.324 4.324 0 0 1-2.068-1.379M14.343 12l-2.882 1.664"></path>
 						</svg>
-						<span>Clippers</span>
 					</div>
 					<nav class="breadcrumb">
 						<a href="/">Projects</a>
@@ -34,20 +33,18 @@ templ ProcessingPage(data ProcessingData) {
 						<span class="current">{ data.ProjectName }</span>
 					</nav>
 				</header>
-
 				<main class="processing-main">
 					<div class="processing-card">
 						<div class="card-header">
 							<h2>Processing Project</h2>
 							<p class="project-name">{ data.ProjectName }</p>
 						</div>
-
 						<div class="stages-container" id="stages-container">
 							<div class="stage" data-stage="preflight">
 								<div class="stage-indicator">
 									<div class="indicator-icon">
 										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-											<circle cx="12" cy="12" r="10"/>
+											<circle cx="12" cy="12" r="10"></circle>
 										</svg>
 									</div>
 									<div class="indicator-line"></div>
@@ -57,12 +54,11 @@ templ ProcessingPage(data ProcessingData) {
 									<p>Verifying dependencies and environment</p>
 								</div>
 							</div>
-
 							<div class="stage" data-stage="normalize">
 								<div class="stage-indicator">
 									<div class="indicator-icon">
 										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-											<circle cx="12" cy="12" r="10"/>
+											<circle cx="12" cy="12" r="10"></circle>
 										</svg>
 									</div>
 									<div class="indicator-line"></div>
@@ -72,12 +68,11 @@ templ ProcessingPage(data ProcessingData) {
 									<p>Processing and normalizing audio levels</p>
 								</div>
 							</div>
-
 							<div class="stage" data-stage="transcribe">
 								<div class="stage-indicator">
 									<div class="indicator-icon">
 										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-											<circle cx="12" cy="12" r="10"/>
+											<circle cx="12" cy="12" r="10"></circle>
 										</svg>
 									</div>
 									<div class="indicator-line"></div>
@@ -87,12 +82,11 @@ templ ProcessingPage(data ProcessingData) {
 									<p>Running Whisper for speech recognition</p>
 								</div>
 							</div>
-
 							<div class="stage" data-stage="caption">
 								<div class="stage-indicator">
 									<div class="indicator-icon">
 										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-											<circle cx="12" cy="12" r="10"/>
+											<circle cx="12" cy="12" r="10"></circle>
 										</svg>
 									</div>
 									<div class="indicator-line"></div>
@@ -102,12 +96,11 @@ templ ProcessingPage(data ProcessingData) {
 									<p>Analyzing images with AI vision model</p>
 								</div>
 							</div>
-
 							<div class="stage" data-stage="windows">
 								<div class="stage-indicator">
 									<div class="indicator-icon">
 										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-											<circle cx="12" cy="12" r="10"/>
+											<circle cx="12" cy="12" r="10"></circle>
 										</svg>
 									</div>
 									<div class="indicator-line"></div>
@@ -117,12 +110,11 @@ templ ProcessingPage(data ProcessingData) {
 									<p>Creating text segments from transcript</p>
 								</div>
 							</div>
-
 							<div class="stage" data-stage="plan">
 								<div class="stage-indicator">
 									<div class="indicator-icon">
 										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-											<circle cx="12" cy="12" r="10"/>
+											<circle cx="12" cy="12" r="10"></circle>
 										</svg>
 									</div>
 								</div>
@@ -132,10 +124,9 @@ templ ProcessingPage(data ProcessingData) {
 								</div>
 							</div>
 						</div>
-
 						<div class="card-footer" id="process-actions">
-							<button 
-								class="btn btn-primary btn-large" 
+							<button
+								class="btn btn-primary btn-large"
 								id="process-btn"
 								hx-post="/api/process"
 								hx-headers={ fmt.Sprintf(`{"project": "%s"}`, data.ProjectName) }
@@ -144,8 +135,8 @@ templ ProcessingPage(data ProcessingData) {
 							>
 								<span class="btn-icon">
 									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-										<path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+										<path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+										<path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 									</svg>
 								</span>
 								Start Processing
@@ -239,11 +230,11 @@ templ ProcessingStages(currentStage int, failedStage int, failedError string) {
 				<div class="indicator-icon">
 					<span class="icon-content">
 						if currentStage > 0 {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
 						} else if currentStage == 0 {
-							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
 						} else {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
 						}
 					</span>
 				</div>
@@ -258,17 +249,16 @@ templ ProcessingStages(currentStage int, failedStage int, failedError string) {
 				}
 			</div>
 		</div>
-
 		<div class="stage" data-stage="normalize">
 			<div class="stage-indicator">
 				<div class="indicator-icon">
 					<span class="icon-content">
 						if currentStage > 1 {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
 						} else if currentStage == 1 {
-							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
 						} else {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
 						}
 					</span>
 				</div>
@@ -283,17 +273,16 @@ templ ProcessingStages(currentStage int, failedStage int, failedError string) {
 				}
 			</div>
 		</div>
-
 		<div class="stage" data-stage="transcribe">
 			<div class="stage-indicator">
 				<div class="indicator-icon">
 					<span class="icon-content">
 						if currentStage > 2 {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
 						} else if currentStage == 2 {
-							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
 						} else {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
 						}
 					</span>
 				</div>
@@ -308,17 +297,16 @@ templ ProcessingStages(currentStage int, failedStage int, failedError string) {
 				}
 			</div>
 		</div>
-
 		<div class="stage" data-stage="caption">
 			<div class="stage-indicator">
 				<div class="indicator-icon">
 					<span class="icon-content">
 						if currentStage > 3 {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
 						} else if currentStage == 3 {
-							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
 						} else {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
 						}
 					</span>
 				</div>
@@ -333,17 +321,16 @@ templ ProcessingStages(currentStage int, failedStage int, failedError string) {
 				}
 			</div>
 		</div>
-
 		<div class="stage" data-stage="windows">
 			<div class="stage-indicator">
 				<div class="indicator-icon">
 					<span class="icon-content">
 						if currentStage > 4 {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
 						} else if currentStage == 4 {
-							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
 						} else {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
 						}
 					</span>
 				</div>
@@ -358,17 +345,16 @@ templ ProcessingStages(currentStage int, failedStage int, failedError string) {
 				}
 			</div>
 		</div>
-
 		<div class="stage" data-stage="plan">
 			<div class="stage-indicator">
 				<div class="indicator-icon">
 					<span class="icon-content">
 						if currentStage > 5 {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
 						} else if currentStage == 5 {
-							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+							<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
 						} else {
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
 						}
 					</span>
 				</div>
@@ -388,7 +374,7 @@ templ ProcessingStages(currentStage int, failedStage int, failedError string) {
 templ ProcessingProgressUI(projectName string) {
 	<div class="processing-loading-mini">
 		<svg class="spinner-mini" viewBox="0 0 24 24">
-			<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="60" stroke-dashoffset="20"/>
+			<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="60" stroke-dashoffset="20"></circle>
 		</svg>
 	</div>
 }
@@ -398,7 +384,7 @@ templ ProcessingCompleteUI(projectName string) {
 		<div class="complete-content">
 			<div class="success-icon-large">
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 				</svg>
 			</div>
 			<h3>Processing Complete!</h3>
@@ -406,7 +392,7 @@ templ ProcessingCompleteUI(projectName string) {
 			<a href={ templ.SafeURL("/projects/" + projectName) } class="btn btn-success btn-large">
 				<span class="btn-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12"/>
+						<path stroke-linecap="round" stroke-linejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
 					</svg>
 				</span>
 				Open Editor
@@ -420,13 +406,13 @@ templ ProcessingErrorUI(message string, projectName string) {
 		<div class="error-content">
 			<div class="error-icon-large">
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 				</svg>
 			</div>
 			<h3>Processing Failed</h3>
 			<p class="error-detail">{ message }</p>
-			<button 
-				class="btn btn-primary btn-large" 
+			<button
+				class="btn btn-primary btn-large"
 				hx-post="/api/process"
 				hx-headers={ fmt.Sprintf(`{"project": "%s"}`, projectName) }
 				hx-target="#process-actions"
@@ -434,11 +420,89 @@ templ ProcessingErrorUI(message string, projectName string) {
 			>
 				<span class="btn-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+						<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
 					</svg>
 				</span>
 				Try Again
 			</button>
+		</div>
+	</div>
+}
+
+templ RenderProgressUI(current int, total int, aspectName string) {
+	<div class="render-progress">
+		<div class="render-progress-content">
+			<div class="render-spinner">
+				<svg class="spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+				</svg>
+			</div>
+			<h3>Rendering Video</h3>
+			<p class="render-aspect">
+				Rendering <strong>{ aspectName }</strong>
+				if total > 1 {
+					({ current + 1 }/{ total })
+				}
+			</p>
+			if total > 1 {
+				<div class="render-progress-bar">
+					<div class="render-progress-fill" style={ fmt.Sprintf("width: %d%%", ((current+1)*100)/total) }></div>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ RenderCompleteUI(outputs []string, projectName string) {
+	<div class="processing-complete">
+		<div class="complete-content">
+			<div class="success-icon-large">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+				</svg>
+			</div>
+			<h3>Render Complete!</h3>
+			<p>Your videos are ready.</p>
+			<div class="render-outputs">
+				for _, output := range outputs {
+					<div class="render-output-item">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+						</svg>
+						<span>{ output }</span>
+					</div>
+				}
+			</div>
+			<a href={ templ.SafeURL("/projects/" + projectName) } class="btn btn-primary btn-large">
+				<span class="btn-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
+					</svg>
+				</span>
+				Back to Editor
+			</a>
+		</div>
+	</div>
+}
+
+templ RenderErrorUI(message string, projectName string) {
+	<div class="processing-error">
+		<div class="error-content">
+			<div class="error-icon-large">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+				</svg>
+			</div>
+			<h3>Render Failed</h3>
+			<p class="error-detail">{ message }</p>
+			<a href={ templ.SafeURL("/projects/" + projectName) } class="btn btn-primary btn-large">
+				<span class="btn-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
+					</svg>
+				</span>
+				Back to Editor
+			</a>
 		</div>
 	</div>
 }

@@ -43,7 +43,7 @@ func ListShaders() []ShaderType {
 	entries, _ := shadersFS.ReadDir("shaders")
 	var shaders []ShaderType
 	for _, e := range entries {
-		if !e.IsDir() && hasSuffix(e.Name(), "_browser.glsl") {`
+		if !e.IsDir() && hasSuffix(e.Name(), "_browser.glsl") {
 			name := stripSuffix(e.Name(), "_browser.glsl")
 			shaders = append(shaders, ShaderType(name))
 		}

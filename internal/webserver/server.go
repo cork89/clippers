@@ -46,7 +46,17 @@ type Server struct {
 		isComplete   bool
 		isFailed     bool
 	}
-	processingMu sync.Mutex
+	processingMu   sync.Mutex
+	renderProgress struct {
+		currentAspect     int
+		totalAspects      int
+		currentAspectName string
+		failedError       string
+		outputs           []string
+		isComplete        bool
+		isFailed          bool
+	}
+	renderMu sync.Mutex
 }
 
 func NewServer(cfg *config.Config, workDir *workdir.WorkDir, db *database.DB, port int, projectsDir string) *Server {
@@ -92,6 +102,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/api/image/", s.handleImage)
 	s.mux.HandleFunc("/api/audio", s.handleAudio)
 	s.mux.HandleFunc("/api/render", s.handleRender)
+	s.mux.HandleFunc("/api/render/status", s.handleRenderStatus)
 	s.mux.HandleFunc("/api/timeline/html", s.handleTimelineHTML)
 	s.mux.HandleFunc("/api/images/html", s.handleImagesHTML)
 	s.mux.HandleFunc("/api/ws/progress", s.handleWebSocket)
@@ -218,6 +229,39 @@ func (s *Server) handleProjectPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.workDir = wd
+
+		if settings, err := s.db.GetProjectSettings(r.Context(), s.workDir.ProjectID()); err == nil && settings != nil {
+			if settings.Shader != "" {
+				s.config.Shader = types.ShaderType(settings.Shader)
+			}
+			if settings.FPS > 0 {
+				s.config.FPS = settings.FPS
+			}
+			if settings.FontSize > 0 {
+				s.config.FontSize = settings.FontSize
+			}
+			if settings.SubtitleMargin > 0 {
+				s.config.SubtitleMargin = settings.SubtitleMargin
+			}
+			if settings.MinShotSec > 0 {
+				s.config.MinShotSec = settings.MinShotSec
+			}
+			if settings.MaxWords > 0 {
+				s.config.MaxWords = settings.MaxWords
+			}
+			if settings.DefaultImageWeight > 0 {
+				s.config.DefaultImageWeight = settings.DefaultImageWeight
+			}
+			if settings.TitleWeight != "" {
+				s.config.TitleWeight = settings.TitleWeight
+			}
+			if settings.BlurStrength > 0 {
+				s.config.BlurStrength = settings.BlurStrength
+			}
+			if settings.Aspects != "" {
+				s.config.Aspects = strings.Split(settings.Aspects, ",")
+			}
+		}
 	}
 
 	exists, _ := s.db.Queries.TimelineExists(r.Context(), s.workDir.ProjectID())
@@ -814,9 +858,150 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
+	s.renderMu.Lock()
+	s.renderProgress.currentAspect = -1
+	s.renderProgress.totalAspects = len(s.config.Aspects)
+	s.renderProgress.currentAspectName = ""
+	s.renderProgress.failedError = ""
+	s.renderProgress.outputs = nil
+	s.renderProgress.isComplete = false
+	s.renderProgress.isFailed = false
+	s.renderMu.Unlock()
+
+	go s.runRender()
+
 	w.WriteHeader(http.StatusAccepted)
 	if err := json.NewEncoder(w).Encode(map[string]string{"status": "started"}); err != nil {
 		log.Printf("Error encoding response: %v", err)
+	}
+}
+
+func (s *Server) runRender() {
+	ctx := context.Background()
+
+	timeline, err := s.db.GetTimeline(ctx, s.workDir.ProjectID())
+	if err != nil {
+		s.renderMu.Lock()
+		s.renderProgress.failedError = fmt.Sprintf("failed to load timeline: %v", err)
+		s.renderProgress.isFailed = true
+		s.renderMu.Unlock()
+		return
+	}
+
+	if settings, err := s.db.GetProjectSettings(ctx, s.workDir.ProjectID()); err == nil && settings != nil {
+		if settings.Shader != "" {
+			s.config.Shader = types.ShaderType(settings.Shader)
+		}
+		if settings.FPS > 0 {
+			s.config.FPS = settings.FPS
+		}
+		if settings.FontSize > 0 {
+			s.config.FontSize = settings.FontSize
+		}
+		if settings.SubtitleMargin > 0 {
+			s.config.SubtitleMargin = settings.SubtitleMargin
+		}
+		if settings.MinShotSec > 0 {
+			s.config.MinShotSec = settings.MinShotSec
+		}
+		if settings.MaxWords > 0 {
+			s.config.MaxWords = settings.MaxWords
+		}
+		if settings.DefaultImageWeight > 0 {
+			s.config.DefaultImageWeight = settings.DefaultImageWeight
+		}
+		if settings.TitleWeight != "" {
+			s.config.TitleWeight = settings.TitleWeight
+		}
+		if settings.BlurStrength > 0 {
+			s.config.BlurStrength = settings.BlurStrength
+		}
+		if settings.Aspects != "" {
+			s.config.Aspects = strings.Split(settings.Aspects, ",")
+		}
+	}
+
+	subtitleAspects := make([]types.SubtitleAspect, 0)
+	for _, aspect := range s.config.Aspects {
+		assPath := s.workDir.Path(fmt.Sprintf("subtitles_%s.ass", aspect))
+		srtPath := s.workDir.Path("subtitles.srt")
+
+		if _, err := os.Stat(assPath); err == nil {
+			subtitleAspects = append(subtitleAspects, types.SubtitleAspect{Aspect: aspect, Path: assPath})
+		} else if _, err := os.Stat(srtPath); err == nil {
+			subtitleAspects = append(subtitleAspects, types.SubtitleAspect{Aspect: aspect, Path: srtPath})
+		} else {
+			s.renderMu.Lock()
+			s.renderProgress.failedError = fmt.Sprintf("no subtitles found for aspect %s", aspect)
+			s.renderProgress.isFailed = true
+			s.renderMu.Unlock()
+			return
+		}
+	}
+
+	var outputs []string
+	for i, sa := range subtitleAspects {
+		s.renderMu.Lock()
+		s.renderProgress.currentAspect = i
+		s.renderProgress.currentAspectName = sa.Aspect
+		s.renderMu.Unlock()
+
+		output, err := pipeline.Render(s.workDir, s.config, timeline, sa.Path, sa.Aspect)
+		if err != nil {
+			s.renderMu.Lock()
+			s.renderProgress.failedError = fmt.Sprintf("render failed for %s: %v", sa.Aspect, err)
+			s.renderProgress.isFailed = true
+			s.renderMu.Unlock()
+			return
+		}
+		outputs = append(outputs, output)
+	}
+
+	s.renderMu.Lock()
+	s.renderProgress.outputs = outputs
+	s.renderProgress.isComplete = true
+	s.renderMu.Unlock()
+}
+
+func (s *Server) handleRenderStatus(w http.ResponseWriter, r *http.Request) {
+	s.renderMu.Lock()
+	defer s.renderMu.Unlock()
+
+	w.Header().Set("Content-Type", "text/html")
+
+	if s.renderProgress.isComplete {
+		component := views.RenderCompleteUI(s.renderProgress.outputs, s.currentProject)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Printf("Error rendering complete: %v", err)
+		}
+		return
+	}
+
+	if s.renderProgress.isFailed {
+		component := views.RenderErrorUI(s.renderProgress.failedError, s.currentProject)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Printf("Error rendering error: %v", err)
+		}
+		return
+	}
+
+	currentAspect := s.renderProgress.currentAspect
+	if currentAspect < 0 {
+		currentAspect = 0
+	}
+
+	component := views.RenderProgressUI(
+		currentAspect,
+		s.renderProgress.totalAspects,
+		s.renderProgress.currentAspectName,
+	)
+	if err := component.Render(r.Context(), w); err != nil {
+		log.Printf("Error rendering progress: %v", err)
 	}
 }
 

@@ -232,3 +232,63 @@ document.addEventListener('keydown', (e) => {
 });
 
 console.log('Clippers Timeline Editor loaded');
+
+// Render polling
+let renderPollInterval = null;
+
+function startRenderPolling() {
+  if (renderPollInterval) return;
+  renderPollInterval = setInterval(function() {
+    htmx.ajax('GET', '/api/render/status', {
+      target: '#timeline-container',
+      swap: 'innerHTML'
+    }).then(function() {
+      // Check if complete or failed
+      const complete = document.querySelector('.processing-complete');
+      const error = document.querySelector('.processing-error');
+      if (complete || error) {
+        stopRenderPolling();
+        // Re-enable render button
+        const renderBtn = document.getElementById('render-btn');
+        if (renderBtn) {
+          renderBtn.classList.remove('loading');
+          renderBtn.disabled = false;
+        }
+      }
+    }).catch(function() {
+      stopRenderPolling();
+    });
+  }, 2000);
+}
+
+function stopRenderPolling() {
+  if (renderPollInterval) {
+    clearInterval(renderPollInterval);
+    renderPollInterval = null;
+  }
+}
+
+// Handle render button click
+document.addEventListener('htmx:beforeRequest', function(evt) {
+  if (evt.detail.pathInfo.requestPath === '/api/render') {
+    const renderBtn = document.getElementById('render-btn');
+    if (renderBtn) {
+      renderBtn.classList.add('loading');
+      renderBtn.disabled = true;
+    }
+    startRenderPolling();
+  }
+});
+
+document.addEventListener('htmx:afterRequest', function(evt) {
+  if (evt.detail.pathInfo.requestPath === '/api/render') {
+    if (!evt.detail.successful) {
+      const renderBtn = document.getElementById('render-btn');
+      if (renderBtn) {
+        renderBtn.classList.remove('loading');
+        renderBtn.disabled = false;
+      }
+      stopRenderPolling();
+    }
+  }
+});

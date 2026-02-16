@@ -1652,6 +1652,13 @@ body {
   color: var(--accent-primary);
 }
 
+.app-header .logo svg {
+  width: 28px;
+  height: 28px;
+  color: var(--accent-primary);
+}
+
+
 .processing-header .breadcrumb {
   display: flex;
   align-items: center;
@@ -2056,4 +2063,93 @@ body {
     width: 16px;
     height: 16px;
   }
+}
+
+/* Render Progress */
+.render-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+.render-progress-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 400px;
+}
+
+.render-spinner {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1.5rem;
+  color: var(--accent-primary);
+}
+
+.render-spinner svg {
+  width: 100%;
+  height: 100%;
+}
+
+.render-progress h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.render-aspect {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.render-aspect strong {
+  color: var(--accent-primary);
+}
+
+.render-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.render-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-success));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.render-outputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  width: 100%;
+}
+
+.render-output-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.render-output-item svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--accent-success);
+}
+
+.render-output-item span {
+  word-break: break-all;
 }
