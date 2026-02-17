@@ -13,6 +13,7 @@ type ProjectInfo struct {
 	AudioFile  string
 	HasImages  bool
 	ImageCount int
+	CreatedAt  string
 	ModifiedAt string
 }
 
@@ -35,40 +36,97 @@ templ ProjectSelector(data ProjectsData) {
 				</div>
 			</header>
 			<main class="projects-main">
-				<section class="create-project-card">
-					<div class="create-project-header">
-						<h2>Create New Project</h2>
-						<p>Drop an MP3 and one image. The image will be saved as <code>default.png</code>.</p>
-					</div>
-					<form id="create-project-form" class="create-project-form">
-						<label class="create-project-name" for="project-name">
-							<span>Project Name (optional)</span>
-							<input id="project-name" name="project" type="text" placeholder="Auto-derived from MP3 filename"/>
-						</label>
-						<div class="dropzone-grid">
-							<div class="dropzone" data-input-id="audio-input">
-								<input id="audio-input" name="audio" type="file" accept=".mp3,audio/mpeg" required/>
-								<div class="dropzone-label">MP3 Audio</div>
-								<div class="dropzone-hint">Click or drag an MP3 here</div>
-								<div class="dropzone-file" id="audio-file-name">No file selected</div>
+				<div class="projects-grid">
+					<button
+						id="show-create-project"
+						type="button"
+						class="project-card create-project-trigger-card"
+						aria-controls="create-project-card"
+						aria-expanded="false"
+					>
+						<span class="create-project-trigger-icon" aria-hidden="true">
+							<svg viewBox="0 0 24 24" role="img" focusable="false">
+								<path d="M12 5v14M5 12h14"></path>
+							</svg>
+						</span>
+						<span class="create-project-trigger-text">Create New Project</span>
+					</button>
+					<section id="create-project-card" class="project-card create-project-card is-hidden">
+						<div class="create-project-header">
+							<h2>Create New Project</h2>
+							<p>Drop an MP3 and one image. The image will be saved as <code>default.png</code>.</p>
+						</div>
+						<form id="create-project-form" class="create-project-form">
+							<label class="create-project-name" for="project-name">
+								<span>Project Name (optional)</span>
+								<input id="project-name" name="project" type="text" placeholder="Auto-derived from MP3 filename"/>
+							</label>
+							<div class="dropzone-grid">
+								<div class="dropzone" data-input-id="audio-input">
+									<input id="audio-input" name="audio" type="file" accept=".mp3,audio/mpeg" required/>
+									<div class="dropzone-label">MP3 Audio</div>
+									<div class="dropzone-hint">Click or drag an MP3 here</div>
+									<div class="dropzone-file" id="audio-file-name">No file selected</div>
+								</div>
+								<div class="dropzone" data-input-id="image-input">
+									<input id="image-input" name="image" type="file" accept="image/*" required/>
+									<div class="dropzone-label">Cover Image</div>
+									<div class="dropzone-hint">Click or drag an image here</div>
+									<div class="dropzone-file" id="image-file-name">No file selected</div>
+								</div>
 							</div>
-							<div class="dropzone" data-input-id="image-input">
-								<input id="image-input" name="image" type="file" accept="image/*" required/>
-								<div class="dropzone-label">Cover Image</div>
-								<div class="dropzone-hint">Click or drag an image here</div>
-								<div class="dropzone-file" id="image-file-name">No file selected</div>
+							<div class="create-project-actions">
+								<button type="submit" class="btn btn-primary">Create Project</button>
+								<button id="cancel-create-project" type="button" class="btn btn-secondary">Cancel</button>
+								<span id="create-project-status" class="create-project-status"></span>
+							</div>
+						</form>
+					</section>
+					for _, project := range data.Projects {
+						<div class="project-card">
+							<div class="project-header">
+								<h3>{ project.Name }</h3>
+								<div class="project-menu">
+									<button class="menu-toggle" data-project={ project.Name }>
+										<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+											<circle cx="8" cy="3" r="1.5"></circle>
+											<circle cx="8" cy="8" r="1.5"></circle>
+											<circle cx="8" cy="13" r="1.5"></circle>
+										</svg>
+									</button>
+									<div class="menu-dropdown" id={ "menu-" + project.Name }>
+										<button class="menu-item delete-btn" data-project={ project.Name }>Delete Data</button>
+									</div>
+								</div>
+							</div>
+							<div class="project-details">
+								<div class="detail-item">
+									<span class="detail-label">Audio:</span>
+									<span class="detail-value">{ project.AudioFile }</span>
+								</div>
+								if project.HasImages {
+									<div class="detail-item">
+										<span class="detail-label">Images:</span>
+										<span class="detail-value">{ formatImageCount(project.ImageCount) }</span>
+									</div>
+								}
+								<div class="detail-item">
+									<span class="detail-label">Created:</span>
+									<span class="detail-value">{ project.CreatedAt }</span>
+								</div>
+							</div>
+							<div class="project-actions">
+								<a href={ templ.SafeURL(data.BasePath + "/projects/" + project.Name) } class="btn btn-primary">
+									Open Project
+								</a>
 							</div>
 						</div>
-						<div class="create-project-actions">
-							<button type="submit" class="btn btn-primary">Create Project</button>
-							<span id="create-project-status" class="create-project-status"></span>
-						</div>
-					</form>
-				</section>
+					}
+				</div>
 				if len(data.Projects) == 0 {
 					<div class="no-projects">
 						<h2>No Projects Found</h2>
-						<p>Create your first project using the uploader above, or add folders manually in the format below.</p>
+						<p>Create your first project with the card above, or add folders manually in the format below.</p>
 						<ul>
 							<li>An MP3 audio file</li>
 							<li>An "images" folder with your images</li>
@@ -87,46 +145,6 @@ templ ProjectSelector(data ProjectsData) {
 							</pre>
 						</div>
 					</div>
-				} else {
-					<div class="projects-grid">
-						for _, project := range data.Projects {
-							<div class="project-card">
-								<div class="project-header">
-									<h3>{ project.Name }</h3>
-									<span class="project-date">{ project.ModifiedAt }</span>
-									<div class="project-menu">
-										<button class="menu-toggle" data-project={ project.Name }>
-											<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-												<circle cx="8" cy="3" r="1.5"></circle>
-												<circle cx="8" cy="8" r="1.5"></circle>
-												<circle cx="8" cy="13" r="1.5"></circle>
-											</svg>
-										</button>
-										<div class="menu-dropdown" id={ "menu-" + project.Name }>
-											<button class="menu-item delete-btn" data-project={ project.Name }>Delete Data</button>
-										</div>
-									</div>
-								</div>
-								<div class="project-details">
-									<div class="detail-item">
-										<span class="detail-label">Audio:</span>
-										<span class="detail-value">{ project.AudioFile }</span>
-									</div>
-									if project.HasImages {
-										<div class="detail-item">
-											<span class="detail-label">Images:</span>
-											<span class="detail-value">{ formatImageCount(project.ImageCount) }</span>
-										</div>
-									}
-								</div>
-								<div class="project-actions">
-									<a href={ templ.SafeURL(data.BasePath + "/projects/" + project.Name) } class="btn btn-primary">
-										Open Project
-									</a>
-								</div>
-							</div>
-						}
-					</div>
 				}
 			</main>
 			<script>
@@ -136,6 +154,39 @@ templ ProjectSelector(data ProjectsData) {
 				const imageInput = document.getElementById('image-input');
 				const audioFileName = document.getElementById('audio-file-name');
 				const imageFileName = document.getElementById('image-file-name');
+				const createProjectTrigger = document.getElementById('show-create-project');
+				const createProjectCard = document.getElementById('create-project-card');
+				const cancelCreateProject = document.getElementById('cancel-create-project');
+				const projectNameInput = document.getElementById('project-name');
+
+				function hideCreateProjectCard() {
+					if (!createProjectCard || !createProjectTrigger) {
+						return;
+					}
+					createProjectCard.classList.add('is-hidden');
+					createProjectTrigger.classList.remove('is-hidden');
+					createProjectTrigger.setAttribute('aria-expanded', 'false');
+					if (statusEl) {
+						statusEl.textContent = '';
+					}
+					if (createForm) {
+						createForm.reset();
+					}
+					setDropzoneFileName(audioInput, audioFileName);
+					setDropzoneFileName(imageInput, imageFileName);
+				}
+
+				function showCreateProjectCard() {
+					if (!createProjectCard || !createProjectTrigger) {
+						return;
+					}
+					createProjectCard.classList.remove('is-hidden');
+					createProjectTrigger.classList.add('is-hidden');
+					createProjectTrigger.setAttribute('aria-expanded', 'true');
+					if (projectNameInput) {
+						projectNameInput.focus();
+					}
+				}
 
 				function setDropzoneFileName(input, target) {
 					if (!input || !target) {
@@ -180,39 +231,53 @@ templ ProjectSelector(data ProjectsData) {
 
 				document.querySelectorAll('.dropzone').forEach(bindDropzone);
 
-				audioInput.addEventListener('change', function() {
-					setDropzoneFileName(audioInput, audioFileName);
-				});
+				if (createProjectTrigger) {
+					createProjectTrigger.addEventListener('click', showCreateProjectCard);
+				}
 
-				imageInput.addEventListener('change', function() {
-					setDropzoneFileName(imageInput, imageFileName);
-				});
+				if (cancelCreateProject) {
+					cancelCreateProject.addEventListener('click', hideCreateProjectCard);
+				}
 
-				createForm.addEventListener('submit', async function(e) {
-					e.preventDefault();
-					statusEl.textContent = 'Creating project...';
+				if (audioInput) {
+					audioInput.addEventListener('change', function() {
+						setDropzoneFileName(audioInput, audioFileName);
+					});
+				}
 
-					const formData = new FormData(createForm);
-					try {
-						const response = await fetch('/api/project/create', {
-							method: 'POST',
-							body: formData
-						});
-						if (!response.ok) {
-							const text = await response.text();
-							throw new Error(text || 'Failed to create project');
+				if (imageInput) {
+					imageInput.addEventListener('change', function() {
+						setDropzoneFileName(imageInput, imageFileName);
+					});
+				}
+
+				if (createForm) {
+					createForm.addEventListener('submit', async function(e) {
+						e.preventDefault();
+						statusEl.textContent = 'Creating project...';
+
+						const formData = new FormData(createForm);
+						try {
+							const response = await fetch('/api/project/create', {
+								method: 'POST',
+								body: formData
+							});
+							if (!response.ok) {
+								const text = await response.text();
+								throw new Error(text || 'Failed to create project');
+							}
+
+							const payload = await response.json();
+							if (payload && payload.project) {
+								window.location.href = '/projects/' + encodeURIComponent(payload.project);
+								return;
+							}
+							window.location.reload();
+						} catch (err) {
+							statusEl.textContent = err.message;
 						}
-
-						const payload = await response.json();
-						if (payload && payload.project) {
-							window.location.href = '/projects/' + encodeURIComponent(payload.project);
-							return;
-						}
-						window.location.reload();
-					} catch (err) {
-						statusEl.textContent = err.message;
-					}
-				});
+					});
+				}
 
 				document.addEventListener('click', function(e) {
 					const toggles = document.querySelectorAll('.menu-toggle');

@@ -163,6 +163,7 @@ func (s *Server) showProjectSelector(w http.ResponseWriter, r *http.Request) {
 			AudioFile:  p.AudioFile,
 			HasImages:  p.HasImages,
 			ImageCount: p.ImageCount,
+			CreatedAt:  p.CreatedAt.Format("Jan 2, 2006 3:04 PM"),
 			ModifiedAt: p.ModifiedAt.Format("Jan 2, 2006 3:04 PM"),
 		}
 	}

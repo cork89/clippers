@@ -127,14 +127,14 @@ async function openSettingsModal() {
         const response = await fetch('/api/project/settings');
         if (response.ok) {
             const settings = await response.json();
-            document.getElementById('settings-shader').value = settings.shader || 'none';
-            document.getElementById('settings-aspects').value = settings.aspects || '1x1,16x9,9x16';
-            document.getElementById('settings-font-size').value = settings.font_size || 60;
-            document.getElementById('settings-subtitle-margin').value = settings.subtitle_margin || 20;
-            document.getElementById('settings-blur').value = settings.blur_strength || 20;
+            document.getElementById('settings-shader').value = settings.shader ?? 'none';
+            document.getElementById('settings-aspects').value = settings.aspects ?? '1x1,16x9,9x16';
+            document.getElementById('settings-font-size').value = settings.font_size ?? 60;
+            document.getElementById('settings-subtitle-margin').value = settings.subtitle_margin ?? 20;
+            document.getElementById('settings-blur').value = settings.blur_strength ?? 20;
             updateSliderValue(document.getElementById('settings-blur'));
             
-            initAspectsFromValue(settings.aspects);
+            initAspectsFromValue(settings.aspects ?? '1x1,16x9,9x16');
         }
     } catch (e) {
         console.error('Failed to load settings:', e);
@@ -170,12 +170,16 @@ function closeSettingsModal() {
 }
 
 async function saveSettings() {
+    const fontSize = parseInt(document.getElementById('settings-font-size').value, 10);
+    const subtitleMargin = parseInt(document.getElementById('settings-subtitle-margin').value, 10);
+    const blurStrength = parseInt(document.getElementById('settings-blur').value, 10);
+
     const settings = {
         shader: document.getElementById('settings-shader').value,
         aspects: document.getElementById('settings-aspects').value || '1x1,16x9,9x16',
-        font_size: parseInt(document.getElementById('settings-font-size').value) || 60,
-        subtitle_margin: parseInt(document.getElementById('settings-subtitle-margin').value) || 20,
-        blur_strength: parseInt(document.getElementById('settings-blur').value) || 20
+        font_size: Number.isNaN(fontSize) ? 60 : fontSize,
+        subtitle_margin: Number.isNaN(subtitleMargin) ? 20 : subtitleMargin,
+        blur_strength: Number.isNaN(blurStrength) ? 20 : blurStrength
     };
     
     try {

@@ -188,7 +188,7 @@ func getFontSize(s *types.ProjectSettings) int {
 }
 
 func getSubtitleMargin(s *types.ProjectSettings) int {
-	if s == nil || s.SubtitleMargin == 0 {
+	if s == nil {
 		return 20
 	}
 	return s.SubtitleMargin
@@ -209,7 +209,7 @@ func getMaxWords(s *types.ProjectSettings) int {
 }
 
 func getBlurStrength(s *types.ProjectSettings) int {
-	if s == nil || s.BlurStrength == 0 {
+	if s == nil {
 		return 20
 	}
 	return s.BlurStrength
