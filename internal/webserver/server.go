@@ -7,12 +7,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	"image/png"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -90,9 +95,12 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/projects/", s.handleProjectPage)
 	s.mux.HandleFunc("/api/projects", s.handleProjectsList)
 	s.mux.HandleFunc("/api/project", s.handleProject)
+	s.mux.HandleFunc("/api/project/create", s.handleCreateProject)
 	s.mux.HandleFunc("/api/project/settings", s.handleProjectSettings)
 	s.mux.HandleFunc("/api/settings/modal", s.handleSettingsModal)
 	s.mux.HandleFunc("/api/save", s.handleSave)
+	s.mux.HandleFunc("/api/subtitles/regenerate/srt", s.handleRegenerateSRT)
+	s.mux.HandleFunc("/api/subtitles/regenerate/ass", s.handleRegenerateASS)
 	s.mux.HandleFunc("/api/process", s.handleProcess)
 	s.mux.HandleFunc("/api/process/status", s.handleProcessStatus)
 	s.mux.HandleFunc("/api/timeline", s.handleTimeline)
@@ -452,6 +460,89 @@ func (s *Server) handleSave(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{"status": "saved"}); err != nil {
 		log.Printf("Error encoding response: %v", err)
+	}
+}
+
+func (s *Server) handleRegenerateSRT(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
+	transcript, err := s.db.GetFullTranscript(r.Context(), s.workDir.ProjectID())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to read transcript: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	timeline, err := s.db.GetTimeline(r.Context(), s.workDir.ProjectID())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to read timeline: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if _, err := pipeline.GenerateSubtitles(s.workDir, s.config, transcript, timeline, true); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to regenerate SRT: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": "Regenerated subtitles.srt",
+	}); err != nil {
+		log.Printf("Error encoding SRT response: %v", err)
+	}
+}
+
+func (s *Server) handleRegenerateASS(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.workDir == nil {
+		http.Error(w, "No project loaded", http.StatusBadRequest)
+		return
+	}
+
+	srtPath := s.workDir.Path("subtitles.srt")
+	if _, err := os.Stat(srtPath); err != nil {
+		transcript, trErr := s.db.GetFullTranscript(r.Context(), s.workDir.ProjectID())
+		if trErr != nil {
+			http.Error(w, fmt.Sprintf("Failed to read transcript: %v", trErr), http.StatusBadRequest)
+			return
+		}
+
+		timeline, tlErr := s.db.GetTimeline(r.Context(), s.workDir.ProjectID())
+		if tlErr != nil {
+			http.Error(w, fmt.Sprintf("Failed to read timeline: %v", tlErr), http.StatusBadRequest)
+			return
+		}
+
+		if _, genErr := pipeline.GenerateSubtitles(s.workDir, s.config, transcript, timeline, true); genErr != nil {
+			http.Error(w, fmt.Sprintf("Failed to generate SRT before ASS conversion: %v", genErr), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	assFiles, err := pipeline.ConvertAndProcessSubtitles(s.workDir, s.config, srtPath, true)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to regenerate ASS files: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": fmt.Sprintf("Regenerated %d ASS subtitle files", len(assFiles)),
+	}); err != nil {
+		log.Printf("Error encoding ASS response: %v", err)
 	}
 }
 
@@ -1305,6 +1396,132 @@ func (s *Server) handleProcessStatus(w http.ResponseWriter, r *http.Request) {
 	component := views.ProcessingStages(currentStage, s.processingProgress.failedStage, s.processingProgress.failedError)
 	if err := component.Render(r.Context(), w); err != nil {
 		log.Printf("Error rendering stages: %v", err)
+	}
+}
+
+var projectNameSanitizer = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
+
+func sanitizeProjectName(name string) string {
+	sanitized := strings.TrimSpace(name)
+	sanitized = strings.ReplaceAll(sanitized, " ", "-")
+	sanitized = projectNameSanitizer.ReplaceAllString(sanitized, "-")
+	sanitized = strings.Trim(sanitized, "-_")
+	return sanitized
+}
+
+func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.projectsDir == "" {
+		http.Error(w, "Projects directory is not configured", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseMultipartForm(256 << 20); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid multipart form: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	audioFile, audioHeader, err := r.FormFile("audio")
+	if err != nil {
+		http.Error(w, "Audio file is required", http.StatusBadRequest)
+		return
+	}
+	defer audioFile.Close()
+
+	if strings.ToLower(filepath.Ext(audioHeader.Filename)) != ".mp3" {
+		http.Error(w, "Audio file must be an MP3", http.StatusBadRequest)
+		return
+	}
+
+	imageFile, _, err := r.FormFile("image")
+	if err != nil {
+		http.Error(w, "Image file is required", http.StatusBadRequest)
+		return
+	}
+	defer imageFile.Close()
+
+	projectName := sanitizeProjectName(r.FormValue("project"))
+	if projectName == "" {
+		audioBaseName := strings.TrimSuffix(audioHeader.Filename, filepath.Ext(audioHeader.Filename))
+		projectName = sanitizeProjectName(audioBaseName)
+	}
+	if projectName == "" {
+		http.Error(w, "Project name is required", http.StatusBadRequest)
+		return
+	}
+
+	projectPath := filepath.Join(s.projectsDir, projectName)
+	if info, err := os.Stat(projectPath); err == nil {
+		if info.IsDir() {
+			http.Error(w, "Project already exists", http.StatusConflict)
+			return
+		}
+		http.Error(w, "Project path exists and is not a directory", http.StatusConflict)
+		return
+	} else if !os.IsNotExist(err) {
+		http.Error(w, fmt.Sprintf("Failed to check project path: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	imagesPath := filepath.Join(projectPath, "images")
+	if err := os.MkdirAll(imagesPath, 0o755); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create project directory: %v", err), http.StatusInternalServerError)
+		return
+	}
+	cleanupProject := true
+	defer func() {
+		if cleanupProject {
+			if err := os.RemoveAll(projectPath); err != nil {
+				log.Printf("Failed to cleanup incomplete project %q: %v", projectPath, err)
+			}
+		}
+	}()
+
+	audioDst, err := os.Create(filepath.Join(projectPath, "audio.mp3"))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audio file: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if _, err := io.Copy(audioDst, audioFile); err != nil {
+		audioDst.Close()
+		http.Error(w, fmt.Sprintf("Failed to save audio file: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := audioDst.Close(); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to finalize audio file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	imageSrc, _, err := image.Decode(imageFile)
+	if err != nil {
+		http.Error(w, "Unsupported image format. Use png, jpg, or gif", http.StatusBadRequest)
+		return
+	}
+	imageDst, err := os.Create(filepath.Join(imagesPath, "default.png"))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create image file: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := png.Encode(imageDst, imageSrc); err != nil {
+		imageDst.Close()
+		http.Error(w, fmt.Sprintf("Failed to save image file: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := imageDst.Close(); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to finalize image file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	cleanupProject = false
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(map[string]string{
+		"status":  "created",
+		"project": projectName,
+	}); err != nil {
+		log.Printf("Error encoding response: %v", err)
 	}
 }
 

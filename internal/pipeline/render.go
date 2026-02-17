@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/cork89/clippers/assets"
 	"github.com/cork89/clippers/internal/config"
 	"github.com/cork89/clippers/internal/types"
 	"github.com/cork89/clippers/internal/workdir"
@@ -225,11 +226,18 @@ func renderFinalPass(wd *workdir.WorkDir, videoPath, subtitlePath, outputPath st
 	// Determine filter based on subtitle type
 	var filter string
 	if strings.HasSuffix(strings.ToLower(subtitlePath), ".ass") {
-		filter = fmt.Sprintf("ass='%s'", escapedSubtitle)
+		fontsDir, err := ensureASSFontDir(wd)
+		if err != nil {
+			return fmt.Errorf("failed to prepare subtitle font directory: %w", err)
+		}
+		escapedFontsDir := filepath.ToSlash(fontsDir)
+		escapedFontsDir = strings.ReplaceAll(escapedFontsDir, ":", "\\:")
+		escapedFontsDir = strings.ReplaceAll(escapedFontsDir, "'", "\\'")
+		filter = fmt.Sprintf("ass='%s':fontsdir='%s'", escapedSubtitle, escapedFontsDir)
 	} else {
 		subtitleStyle := fmt.Sprintf(
 			"FontSize=%d,"+
-				"FontName=AsapCondensed-Medium,"+
+				"FontName=Asap Condensed,"+
 				"PrimaryColour=&HFFFFFF,"+
 				"BackColour=&H80000000,"+
 				"BorderStyle=4,"+
@@ -266,6 +274,20 @@ func renderFinalPass(wd *workdir.WorkDir, videoPath, subtitlePath, outputPath st
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
+}
+
+func ensureASSFontDir(wd *workdir.WorkDir) (string, error) {
+	fontsDir := wd.Path("fonts")
+	if err := os.MkdirAll(fontsDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create fonts directory: %w", err)
+	}
+
+	fontPath := filepath.Join(fontsDir, "AsapCondensed-Medium.ttf")
+	if err := os.WriteFile(fontPath, assets.AsapCondensedMedium, 0644); err != nil {
+		return "", fmt.Errorf("failed to write embedded font: %w", err)
+	}
+
+	return fontsDir, nil
 }
 
 func writeConcatFile(path string, timeline *types.Timeline) error {

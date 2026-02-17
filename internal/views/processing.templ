@@ -130,8 +130,7 @@ templ ProcessingPage(data ProcessingData) {
 								id="process-btn"
 								hx-post="/api/process"
 								hx-headers={ fmt.Sprintf(`{"project": "%s"}`, data.ProjectName) }
-								hx-target="#process-actions"
-								hx-swap="innerHTML"
+								hx-swap="none"
 							>
 								<span class="btn-icon">
 									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

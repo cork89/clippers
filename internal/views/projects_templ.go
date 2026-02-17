@@ -46,12 +46,12 @@ func ProjectSelector(data ProjectsData) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Select Project - Clippers</title><script src=\"https://unpkg.com/htmx.org@1.9.12\" integrity=\"sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2\" crossorigin=\"anonymous\"></script><link rel=\"stylesheet\" href=\"/static/style.css\"></head><body class=\"projects-page\"><header class=\"app-header\"><div class=\"logo\"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m7.848 8.25 1.536.887M7.848 8.25a3 3 0 1 1-5.196-3 3 3 0 0 1 5.196 3Zm1.536.887a2.165 2.165 0 0 1 1.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 1 1-5.196 3 3 3 0 0 1 5.196-3Zm1.536-.887a2.165 2.165 0 0 0 1.083-1.838c.005-.352.054-.695.14-1.025m-1.223 2.863 2.077-1.199m0-3.328a4.323 4.323 0 0 1 2.068-1.379l5.325-1.628a4.5 4.5 0 0 1 2.48-.044l.803.215-7.794 4.5m-2.882-1.664A4.33 4.33 0 0 0 10.607 12m3.736 0 7.794 4.5-.802.215a4.5 4.5 0 0 1-2.48-.043l-5.326-1.629a4.324 4.324 0 0 1-2.068-1.379M14.343 12l-2.882 1.664\"></path></svg></div></header><main class=\"projects-main\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Select Project - Clippers</title><script src=\"https://unpkg.com/htmx.org@1.9.12\" integrity=\"sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2\" crossorigin=\"anonymous\"></script><link rel=\"stylesheet\" href=\"/static/style.css\"></head><body class=\"projects-page\"><header class=\"app-header\"><div class=\"logo\"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m7.848 8.25 1.536.887M7.848 8.25a3 3 0 1 1-5.196-3 3 3 0 0 1 5.196 3Zm1.536.887a2.165 2.165 0 0 1 1.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 1 1-5.196 3 3 3 0 0 1 5.196-3Zm1.536-.887a2.165 2.165 0 0 0 1.083-1.838c.005-.352.054-.695.14-1.025m-1.223 2.863 2.077-1.199m0-3.328a4.323 4.323 0 0 1 2.068-1.379l5.325-1.628a4.5 4.5 0 0 1 2.48-.044l.803.215-7.794 4.5m-2.882-1.664A4.33 4.33 0 0 0 10.607 12m3.736 0 7.794 4.5-.802.215a4.5 4.5 0 0 1-2.48-.043l-5.326-1.629a4.324 4.324 0 0 1-2.068-1.379M14.343 12l-2.882 1.664\"></path></svg></div></header><main class=\"projects-main\"><section class=\"create-project-card\"><div class=\"create-project-header\"><h2>Create New Project</h2><p>Drop an MP3 and one image. The image will be saved as <code>default.png</code>.</p></div><form id=\"create-project-form\" class=\"create-project-form\"><label class=\"create-project-name\" for=\"project-name\"><span>Project Name (optional)</span> <input id=\"project-name\" name=\"project\" type=\"text\" placeholder=\"Auto-derived from MP3 filename\"></label><div class=\"dropzone-grid\"><div class=\"dropzone\" data-input-id=\"audio-input\"><input id=\"audio-input\" name=\"audio\" type=\"file\" accept=\".mp3,audio/mpeg\" required><div class=\"dropzone-label\">MP3 Audio</div><div class=\"dropzone-hint\">Click or drag an MP3 here</div><div class=\"dropzone-file\" id=\"audio-file-name\">No file selected</div></div><div class=\"dropzone\" data-input-id=\"image-input\"><input id=\"image-input\" name=\"image\" type=\"file\" accept=\"image/*\" required><div class=\"dropzone-label\">Cover Image</div><div class=\"dropzone-hint\">Click or drag an image here</div><div class=\"dropzone-file\" id=\"image-file-name\">No file selected</div></div></div><div class=\"create-project-actions\"><button type=\"submit\" class=\"btn btn-primary\">Create Project</button> <span id=\"create-project-status\" class=\"create-project-status\"></span></div></form></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(data.Projects) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"no-projects\"><h2>No Projects Found</h2><p>Create a \"projects\" directory in the current folder and add project folders containing:</p><ul><li>An MP3 audio file</li><li>An \"images\" folder with your images</li></ul><div class=\"example-structure\"><pre>projects/ ├── my-video/ │   ├── audio.mp3 │   └── images/ │       ├── image1.jpg │       └── image2.png └── another-project/ ├── podcast.mp3 └── images/</pre></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"no-projects\"><h2>No Projects Found</h2><p>Create your first project using the uploader above, or add folders manually in the format below.</p><ul><li>An MP3 audio file</li><li>An \"images\" folder with your images</li></ul><div class=\"example-structure\"><pre>projects/ ├── my-video/ │   ├── audio.mp3 │   └── images/ │       ├── image1.jpg │       └── image2.png └── another-project/ ├── podcast.mp3 └── images/</pre></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -68,7 +68,7 @@ func ProjectSelector(data ProjectsData) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 65, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 95, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -81,7 +81,7 @@ func ProjectSelector(data ProjectsData) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(project.ModifiedAt)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 66, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 96, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -94,7 +94,7 @@ func ProjectSelector(data ProjectsData) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 68, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 98, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -107,7 +107,7 @@ func ProjectSelector(data ProjectsData) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs("menu-" + project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 75, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 105, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -120,7 +120,7 @@ func ProjectSelector(data ProjectsData) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 76, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 106, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -133,7 +133,7 @@ func ProjectSelector(data ProjectsData) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(project.AudioFile)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 83, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 113, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -151,7 +151,7 @@ func ProjectSelector(data ProjectsData) templ.Component {
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(formatImageCount(project.ImageCount))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 88, Col: 76}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/projects.templ`, Line: 118, Col: 76}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -181,7 +181,7 @@ func ProjectSelector(data ProjectsData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</main><script>\n\t\t\t\tdocument.addEventListener('click', function(e) {\n\t\t\t\t\tconst toggles = document.querySelectorAll('.menu-toggle');\n\t\t\t\t\tconst dropdowns = document.querySelectorAll('.menu-dropdown');\n\t\t\t\t\t\n\t\t\t\t\ttoggles.forEach(toggle => {\n\t\t\t\t\t\tif (toggle.contains(e.target)) {\n\t\t\t\t\t\t\tconst projectName = toggle.getAttribute('data-project');\n\t\t\t\t\t\t\tconst dropdown = document.getElementById('menu-' + projectName);\n\t\t\t\t\t\t\tdropdown.classList.toggle('show');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\t\n\t\t\t\t\tdropdowns.forEach(dropdown => {\n\t\t\t\t\t\tif (!dropdown.contains(e.target) && !e.target.closest('.menu-toggle')) {\n\t\t\t\t\t\t\tdropdown.classList.remove('show');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t\t\n\t\t\t\tdocument.querySelectorAll('.delete-btn').forEach(btn => {\n\t\t\t\t\tbtn.addEventListener('click', async function(e) {\n\t\t\t\t\t\tconst projectName = this.getAttribute('data-project');\n\t\t\t\t\t\tif (!confirm('Are you sure you want to delete all data for this project? This cannot be undone.')) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t\n\t\t\t\t\t\tconst formData = new FormData();\n\t\t\t\t\t\tformData.append('project', projectName);\n\t\t\t\t\t\t\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tconst response = await fetch('/api/project/delete', {\n\t\t\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\t\t\tbody: formData\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\tif (response.ok) {\n\t\t\t\t\t\t\t\tlocation.reload();\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tconst error = await response.text();\n\t\t\t\t\t\t\t\talert('Failed to delete project: ' + error);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\talert('Error deleting project: ' + err.message);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</main><script>\n\t\t\t\tconst createForm = document.getElementById('create-project-form');\n\t\t\t\tconst statusEl = document.getElementById('create-project-status');\n\t\t\t\tconst audioInput = document.getElementById('audio-input');\n\t\t\t\tconst imageInput = document.getElementById('image-input');\n\t\t\t\tconst audioFileName = document.getElementById('audio-file-name');\n\t\t\t\tconst imageFileName = document.getElementById('image-file-name');\n\n\t\t\t\tfunction setDropzoneFileName(input, target) {\n\t\t\t\t\tif (!input || !target) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\ttarget.textContent = input.files && input.files.length > 0 ? input.files[0].name : 'No file selected';\n\t\t\t\t}\n\n\t\t\t\tfunction bindDropzone(dropzone) {\n\t\t\t\t\tconst inputId = dropzone.getAttribute('data-input-id');\n\t\t\t\t\tconst input = document.getElementById(inputId);\n\t\t\t\t\tif (!input) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\n\t\t\t\t\tdropzone.addEventListener('click', function() {\n\t\t\t\t\t\tinput.click();\n\t\t\t\t\t});\n\n\t\t\t\t\tdropzone.addEventListener('dragover', function(e) {\n\t\t\t\t\t\te.preventDefault();\n\t\t\t\t\t\tdropzone.classList.add('dragging');\n\t\t\t\t\t});\n\n\t\t\t\t\tdropzone.addEventListener('dragleave', function(e) {\n\t\t\t\t\t\te.preventDefault();\n\t\t\t\t\t\tdropzone.classList.remove('dragging');\n\t\t\t\t\t});\n\n\t\t\t\t\tdropzone.addEventListener('drop', function(e) {\n\t\t\t\t\t\te.preventDefault();\n\t\t\t\t\t\tdropzone.classList.remove('dragging');\n\t\t\t\t\t\tif (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst dt = new DataTransfer();\n\t\t\t\t\t\tdt.items.add(e.dataTransfer.files[0]);\n\t\t\t\t\t\tinput.files = dt.files;\n\t\t\t\t\t\tinput.dispatchEvent(new Event('change', { bubbles: true }));\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tdocument.querySelectorAll('.dropzone').forEach(bindDropzone);\n\n\t\t\t\taudioInput.addEventListener('change', function() {\n\t\t\t\t\tsetDropzoneFileName(audioInput, audioFileName);\n\t\t\t\t});\n\n\t\t\t\timageInput.addEventListener('change', function() {\n\t\t\t\t\tsetDropzoneFileName(imageInput, imageFileName);\n\t\t\t\t});\n\n\t\t\t\tcreateForm.addEventListener('submit', async function(e) {\n\t\t\t\t\te.preventDefault();\n\t\t\t\t\tstatusEl.textContent = 'Creating project...';\n\n\t\t\t\t\tconst formData = new FormData(createForm);\n\t\t\t\t\ttry {\n\t\t\t\t\t\tconst response = await fetch('/api/project/create', {\n\t\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\t\tbody: formData\n\t\t\t\t\t\t});\n\t\t\t\t\t\tif (!response.ok) {\n\t\t\t\t\t\t\tconst text = await response.text();\n\t\t\t\t\t\t\tthrow new Error(text || 'Failed to create project');\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tconst payload = await response.json();\n\t\t\t\t\t\tif (payload && payload.project) {\n\t\t\t\t\t\t\twindow.location.href = '/projects/' + encodeURIComponent(payload.project);\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\twindow.location.reload();\n\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\tstatusEl.textContent = err.message;\n\t\t\t\t\t}\n\t\t\t\t});\n\n\t\t\t\tdocument.addEventListener('click', function(e) {\n\t\t\t\t\tconst toggles = document.querySelectorAll('.menu-toggle');\n\t\t\t\t\tconst dropdowns = document.querySelectorAll('.menu-dropdown');\n\t\t\t\t\t\n\t\t\t\t\ttoggles.forEach(toggle => {\n\t\t\t\t\t\tif (toggle.contains(e.target)) {\n\t\t\t\t\t\t\tconst projectName = toggle.getAttribute('data-project');\n\t\t\t\t\t\t\tconst dropdown = document.getElementById('menu-' + projectName);\n\t\t\t\t\t\t\tdropdown.classList.toggle('show');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\t\n\t\t\t\t\tdropdowns.forEach(dropdown => {\n\t\t\t\t\t\tif (!dropdown.contains(e.target) && !e.target.closest('.menu-toggle')) {\n\t\t\t\t\t\t\tdropdown.classList.remove('show');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t\t\n\t\t\t\tdocument.querySelectorAll('.delete-btn').forEach(btn => {\n\t\t\t\t\tbtn.addEventListener('click', async function(e) {\n\t\t\t\t\t\tconst projectName = this.getAttribute('data-project');\n\t\t\t\t\t\tif (!confirm('Are you sure you want to delete all data for this project? This cannot be undone.')) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t\n\t\t\t\t\t\tconst formData = new FormData();\n\t\t\t\t\t\tformData.append('project', projectName);\n\t\t\t\t\t\t\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tconst response = await fetch('/api/project/delete', {\n\t\t\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\t\t\tbody: formData\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\tif (response.ok) {\n\t\t\t\t\t\t\t\tlocation.reload();\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tconst error = await response.text();\n\t\t\t\t\t\t\t\talert('Failed to delete project: ' + error);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\talert('Error deleting project: ' + err.message);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

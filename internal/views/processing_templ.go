@@ -78,7 +78,7 @@ func ProcessingPage(data ProcessingData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" hx-target=\"#process-actions\" hx-swap=\"innerHTML\"><span class=\"btn-icon\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z\"></path> <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M21 12a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg></span> Start Processing</button><p class=\"processing-note\">This may take a few minutes depending on audio length and image count.</p></div></div></main></div><script src=\"/static/app.js\"></script><script>\n\t\t\t\tdocument.body.addEventListener('htmx:beforeRequest', function(evt) {\n\t\t\t\t\tif (evt.detail.pathInfo.requestPath === '/api/process') {\n\t\t\t\t\t\tdocument.getElementById('process-btn').classList.add('loading');\n\t\t\t\t\t\tdocument.getElementById('process-btn').disabled = true;\n\t\t\t\t\t\tstartPolling();\n\t\t\t\t\t}\n\t\t\t\t});\n\n\t\t\t\tdocument.body.addEventListener('htmx:afterRequest', function(evt) {\n\t\t\t\t\tif (evt.detail.pathInfo.requestPath === '/api/process') {\n\t\t\t\t\t\tdocument.getElementById('process-btn').classList.remove('loading');\n\t\t\t\t\t}\n\t\t\t\t});\n\n\t\t\t\tlet pollInterval = null;\n\n\t\t\t\tfunction updateStageClasses(currentStage) {\n\t\t\t\t\tconst stages = document.querySelectorAll('.stage');\n\t\t\t\t\tstages.forEach(function(stage, index) {\n\t\t\t\t\t\tstage.classList.remove('pending', 'running', 'complete', 'failed');\n\t\t\t\t\t\tif (currentStage > index) {\n\t\t\t\t\t\t\tstage.classList.add('complete');\n\t\t\t\t\t\t} else if (currentStage === index) {\n\t\t\t\t\t\t\tstage.classList.add('running');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tstage.classList.add('pending');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tfunction startPolling() {\n\t\t\t\t\tif (pollInterval) return;\n\t\t\t\t\tpollInterval = setInterval(function() {\n\t\t\t\t\t\thtmx.ajax('GET', '/api/process/status', {\n\t\t\t\t\t\t\ttarget: '#stages-container',\n\t\t\t\t\t\t\tswap: 'innerHTML'\n\t\t\t\t\t\t}).then(function() {\n\t\t\t\t\t\t\tconst stagesContainer = document.getElementById('stages-container');\n\t\t\t\t\t\t\tif (stagesContainer) {\n\t\t\t\t\t\t\t\tconst currentStageEl = stagesContainer.querySelector('.stage.running');\n\t\t\t\t\t\t\t\tif (currentStageEl) {\n\t\t\t\t\t\t\t\t\tconst stages = Array.from(stagesContainer.querySelectorAll('.stage'));\n\t\t\t\t\t\t\t\t\tconst currentIdx = stages.indexOf(currentStageEl);\n\t\t\t\t\t\t\t\t\tupdateStageClasses(currentIdx);\n\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\tconst complete = stagesContainer.querySelector('.stage.complete');\n\t\t\t\t\t\t\t\t\tconst failed = stagesContainer.querySelector('.stage.failed');\n\t\t\t\t\t\t\t\t\tif (complete || failed) {\n\t\t\t\t\t\t\t\t\t\tstopPolling();\n\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t}, 2000);\n\t\t\t\t}\n\n\t\t\t\tfunction stopPolling() {\n\t\t\t\t\tif (pollInterval) {\n\t\t\t\t\t\tclearInterval(pollInterval);\n\t\t\t\t\t\tpollInterval = null;\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\tfunction checkComplete() {\n\t\t\t\t\tconst complete = document.querySelector('.stage.complete');\n\t\t\t\t\tconst failed = document.querySelector('.stage.failed');\n\t\t\t\t\tif (complete || failed) {\n\t\t\t\t\t\tstopPolling();\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" hx-swap=\"none\"><span class=\"btn-icon\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z\"></path> <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M21 12a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg></span> Start Processing</button><p class=\"processing-note\">This may take a few minutes depending on audio length and image count.</p></div></div></main></div><script src=\"/static/app.js\"></script><script>\n\t\t\t\tdocument.body.addEventListener('htmx:beforeRequest', function(evt) {\n\t\t\t\t\tif (evt.detail.pathInfo.requestPath === '/api/process') {\n\t\t\t\t\t\tdocument.getElementById('process-btn').classList.add('loading');\n\t\t\t\t\t\tdocument.getElementById('process-btn').disabled = true;\n\t\t\t\t\t\tstartPolling();\n\t\t\t\t\t}\n\t\t\t\t});\n\n\t\t\t\tdocument.body.addEventListener('htmx:afterRequest', function(evt) {\n\t\t\t\t\tif (evt.detail.pathInfo.requestPath === '/api/process') {\n\t\t\t\t\t\tdocument.getElementById('process-btn').classList.remove('loading');\n\t\t\t\t\t}\n\t\t\t\t});\n\n\t\t\t\tlet pollInterval = null;\n\n\t\t\t\tfunction updateStageClasses(currentStage) {\n\t\t\t\t\tconst stages = document.querySelectorAll('.stage');\n\t\t\t\t\tstages.forEach(function(stage, index) {\n\t\t\t\t\t\tstage.classList.remove('pending', 'running', 'complete', 'failed');\n\t\t\t\t\t\tif (currentStage > index) {\n\t\t\t\t\t\t\tstage.classList.add('complete');\n\t\t\t\t\t\t} else if (currentStage === index) {\n\t\t\t\t\t\t\tstage.classList.add('running');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tstage.classList.add('pending');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tfunction startPolling() {\n\t\t\t\t\tif (pollInterval) return;\n\t\t\t\t\tpollInterval = setInterval(function() {\n\t\t\t\t\t\thtmx.ajax('GET', '/api/process/status', {\n\t\t\t\t\t\t\ttarget: '#stages-container',\n\t\t\t\t\t\t\tswap: 'innerHTML'\n\t\t\t\t\t\t}).then(function() {\n\t\t\t\t\t\t\tconst stagesContainer = document.getElementById('stages-container');\n\t\t\t\t\t\t\tif (stagesContainer) {\n\t\t\t\t\t\t\t\tconst currentStageEl = stagesContainer.querySelector('.stage.running');\n\t\t\t\t\t\t\t\tif (currentStageEl) {\n\t\t\t\t\t\t\t\t\tconst stages = Array.from(stagesContainer.querySelectorAll('.stage'));\n\t\t\t\t\t\t\t\t\tconst currentIdx = stages.indexOf(currentStageEl);\n\t\t\t\t\t\t\t\t\tupdateStageClasses(currentIdx);\n\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\tconst complete = stagesContainer.querySelector('.stage.complete');\n\t\t\t\t\t\t\t\t\tconst failed = stagesContainer.querySelector('.stage.failed');\n\t\t\t\t\t\t\t\t\tif (complete || failed) {\n\t\t\t\t\t\t\t\t\t\tstopPolling();\n\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t}, 2000);\n\t\t\t\t}\n\n\t\t\t\tfunction stopPolling() {\n\t\t\t\t\tif (pollInterval) {\n\t\t\t\t\t\tclearInterval(pollInterval);\n\t\t\t\t\t\tpollInterval = null;\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\tfunction checkComplete() {\n\t\t\t\t\tconst complete = document.querySelector('.stage.complete');\n\t\t\t\t\tconst failed = document.querySelector('.stage.failed');\n\t\t\t\t\tif (complete || failed) {\n\t\t\t\t\t\tstopPolling();\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -420,7 +420,7 @@ func ProcessingErrorUI(message string, projectName string) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 413, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 412, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -433,7 +433,7 @@ func ProcessingErrorUI(message string, projectName string) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"project": "%s"}`, projectName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 417, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 416, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -475,7 +475,7 @@ func RenderProgressUI(current int, total int, aspectName string) templ.Component
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(aspectName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 442, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 441, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -493,7 +493,7 @@ func RenderProgressUI(current int, total int, aspectName string) templ.Component
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(current + 1)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 444, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 443, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -506,7 +506,7 @@ func RenderProgressUI(current int, total int, aspectName string) templ.Component
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(total)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 444, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 443, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -529,7 +529,7 @@ func RenderProgressUI(current int, total int, aspectName string) templ.Component
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("width: %d%%", ((current+1)*100)/total))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 449, Col: 98}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 448, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -581,7 +581,7 @@ func RenderCompleteUI(outputs []string, projectName string) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(output)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 472, Col: 20}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 471, Col: 20}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -637,7 +637,7 @@ func RenderErrorUI(message string, projectName string) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 497, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/processing.templ`, Line: 496, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {

@@ -193,7 +193,7 @@ func (fm *FontMeasurer) TextWidth(text string, fontSize int) int {
 		w += adv
 	}
 
-	return int(float64(w) * float64(fontSize) / 64 / float64(fm.ppem))
+	return int((w + 32) >> 6)
 }
 
 // ------------------------------------------------------------
@@ -297,12 +297,12 @@ func addRoundedBackground(input string, subtitleAspect types.SubtitleAspect, asp
 		if styleInjected && strings.HasPrefix(trim, "Format:") {
 			out = append(out, line)
 			out = append(out,
-				"Style: RoundedBox,Asap Condensed Medium,"+strconv.Itoa(aspectCfg.FontSize)+
+				"Style: RoundedBox,Asap Condensed,"+strconv.Itoa(aspectCfg.FontSize)+
 					",&H30000000,&H00000000,&H00000000,&H00000000,"+
 					"0,0,0,0,100,100,0,0,1,0,0,5,10,10,10,1",
 			)
 			out = append(out,
-				"Style: SubText,Asap Condensed Medium,"+strconv.Itoa(aspectCfg.FontSize)+
+				"Style: SubText,Asap Condensed,"+strconv.Itoa(aspectCfg.FontSize)+
 					",&H00FFFFFF,&H00000000,&H00000000,&H00000000,"+
 					"1,0,0,0,100,100,0,0,1,0,0,5,10,10,10,1",
 			)
@@ -326,7 +326,7 @@ func addRoundedBackground(input string, subtitleAspect types.SubtitleAspect, asp
 			plain := removeTags(fields[9])
 			// boxW := fm.TextWidth(plain, aspectCfg.FontSize) + BoxPadding*2 - 20
 
-			boxW := fm.TextWidth(plain, aspectCfg.FontSize) + (BoxPadding * 4)
+			boxW := fm.TextWidth(plain, aspectCfg.FontSize) + (BoxPadding * 12)
 			boxH := aspectCfg.FontSize + BoxPadding*2
 			path := roundedRectPath(boxW, boxH, CornerRadius)
 			// fmt.Println(plain, boxW, boxH)
@@ -337,7 +337,8 @@ func addRoundedBackground(input string, subtitleAspect types.SubtitleAspect, asp
 
 			// posTag := fmt.Sprintf("{\\an5\\pos(%d,%d)}", posX, posY)
 
-			// Background - offset X position
+			// ASS vector drawing coordinates are centered around 0,0 in roundedRectPath,
+			// so offset the position by half box size to align with text center.
 			bgPosTag := fmt.Sprintf("{\\an5\\pos(%d,%d)}", posX+int(boxW/2), posY+int(boxH/2))
 
 			// Text

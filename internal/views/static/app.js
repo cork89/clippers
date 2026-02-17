@@ -81,6 +81,24 @@ document.addEventListener('htmx:afterRequest', (event) => {
     }
   }
 
+  // Handle subtitle regeneration responses
+  if (event.detail.requestConfig?.path?.startsWith('/api/subtitles/regenerate/')) {
+    const responseText = event.detail.xhr?.responseText || '';
+    let message = '';
+    try {
+      const payload = JSON.parse(responseText);
+      message = payload.message || '';
+    } catch (_) {
+      message = responseText;
+    }
+
+    if (event.detail.successful) {
+      showNotification(message || 'Subtitle files regenerated', 'success');
+    } else {
+      showNotification(message || 'Failed to regenerate subtitle files', 'error');
+    }
+  }
+
   // Handle image selection - update timeline cell
   if (event.detail.requestConfig?.path?.includes('/api/segment/current/image')) {
     if (event.detail.successful) {

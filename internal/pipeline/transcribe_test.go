@@ -48,3 +48,36 @@ func TestParseTimestamp(t *testing.T) {
 		t.Fatalf("expected 3723.4, got %.4f", value)
 	}
 }
+
+func TestShouldRetryWhisperOnCPU(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{
+			name:   "cuda not compiled",
+			output: "ValueError: This CTranslate2 package was not compiled with CUDA support",
+			want:   true,
+		},
+		{
+			name:   "missing cudnn",
+			output: "failed to load shared library libcudnn_ops_infer.so",
+			want:   true,
+		},
+		{
+			name:   "generic transcription error",
+			output: "FileNotFoundError: audio.wav",
+			want:   false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := shouldRetryWhisperOnCPU(tc.output)
+			if got != tc.want {
+				t.Fatalf("shouldRetryWhisperOnCPU() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

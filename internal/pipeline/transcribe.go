@@ -36,21 +36,45 @@ func Transcribe(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, db
 	audioPath := wd.Path("audio.wav")
 	outputDir := wd.Path(".")
 
-	cmd := execCommand(whisperBin,
-		audioPath,
-		"--model", cfg.WhisperModel,
-		"--device", "cuda",
-		"--compute_type", "float16",
-		"--vad_filter", "True",
-		"--batched", "True",
-		"--batch_size", "16",
-		"--output_format", "srt",
-		"--output_dir", outputDir,
-	)
+	var output []byte
+	var lastErr error
+	whisperRuns := []struct {
+		device      string
+		computeType string
+	}{
+		{device: "cuda", computeType: "float16"},
+		{device: "cpu", computeType: "int8"},
+	}
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("whisper-ctranslate2 failed: %w\n%s", err, string(output))
+	for i, run := range whisperRuns {
+		cmd := execCommand(whisperBin,
+			audioPath,
+			"--model", cfg.WhisperModel,
+			"--device", run.device,
+			"--compute_type", run.computeType,
+			"--vad_filter", "True",
+			"--batched", "True",
+			"--batch_size", "16",
+			"--output_format", "srt",
+			"--output_dir", outputDir,
+		)
+
+		output, lastErr = cmd.CombinedOutput()
+		if lastErr == nil {
+			break
+		}
+
+		// Retry on CPU only when CUDA is unavailable or misconfigured.
+		if i == 0 && shouldRetryWhisperOnCPU(string(output)) {
+			fmt.Println("  • CUDA transcription unavailable; retrying with CPU")
+			continue
+		}
+
+		return nil, fmt.Errorf("whisper-ctranslate2 failed: %w\n%s", lastErr, string(output))
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("whisper-ctranslate2 failed after CPU fallback: %w\n%s", lastErr, string(output))
 	}
 
 	srtPath := filepath.Join(outputDir, "audio.srt")
@@ -76,6 +100,27 @@ func Transcribe(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, db
 
 	fmt.Printf("  ✓ Transcribed %d segments (%.1fs)\n", len(transcript.Segments), duration)
 	return transcript, nil
+}
+
+func shouldRetryWhisperOnCPU(output string) bool {
+	lower := strings.ToLower(output)
+	cudaErrors := []string{
+		"not compiled with cuda support",
+		"no cuda-capable device is detected",
+		"cuda driver version is insufficient",
+		"failed to load shared library",
+		"libcuda",
+		"cudnn",
+		"cublas",
+	}
+
+	for _, marker := range cudaErrors {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func parseSRT(path string) (*types.Transcript, error) {
