@@ -91,7 +91,8 @@ type Config struct {
 	SelectModel string
 
 	// Flags
-	Force bool
+	Force              bool
+	UseGoASSConversion bool
 }
 
 func getEnvString(key, defaultVal string) string {
@@ -156,6 +157,7 @@ func DefaultConfig() *Config {
 		VisionModel:        getEnvString("CLIPPERS_VISION_MODEL", "gemma3:4b-it-qat"),
 		SelectModel:        getEnvString("CLIPPERS_SELECT_MODEL", "gemma3:4b-it-qat"),
 		Force:              getEnvBool("CLIPPERS_FORCE", false),
+		UseGoASSConversion: getEnvBool("CLIPPERS_USE_GO_ASS_CONVERSION", false),
 	}
 }
 
@@ -164,6 +166,7 @@ func (c *Config) ReloadFromEnv() {
 	c.OllamaHost = getEnvString("CLIPPERS_OLLAMA_HOST", c.OllamaHost)
 	c.VisionModel = getEnvString("CLIPPERS_VISION_MODEL", c.VisionModel)
 	c.SelectModel = getEnvString("CLIPPERS_SELECT_MODEL", c.SelectModel)
+	c.UseGoASSConversion = getEnvBool("CLIPPERS_USE_GO_ASS_CONVERSION", c.UseGoASSConversion)
 }
 
 // AspectConfig holds dimensions and subtitle settings for an aspect ratio

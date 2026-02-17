@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -458,8 +459,17 @@ var serverCmd = &cobra.Command{
 				projectsDir = "projects"
 			}
 
-			if _, err := os.Stat(projectsDir); err != nil {
-				return fmt.Errorf("projects directory not found: %s", projectsDir)
+			info, err := os.Stat(projectsDir)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					if err := os.MkdirAll(projectsDir, 0o755); err != nil {
+						return fmt.Errorf("failed to create projects directory %q: %w", projectsDir, err)
+					}
+				} else {
+					return fmt.Errorf("failed to access projects directory %q: %w", projectsDir, err)
+				}
+			} else if !info.IsDir() {
+				return fmt.Errorf("projects path is not a directory: %s", projectsDir)
 			}
 
 			fmt.Printf("Starting server with project selector (projects dir: %s)\n", projectsDir)
@@ -550,6 +560,7 @@ func init() {
 	persistentFlags.StringVar(&cfg.VisionModel, "vision-model", "llava", "Vision model for captioning")
 	persistentFlags.StringVar(&cfg.SelectModel, "select-model", "gemma3:4b-it-qat", "Model for image selection")
 	persistentFlags.BoolVar(&cfg.Force, "force", false, "Force recompute all stages")
+	persistentFlags.BoolVar(&cfg.UseGoASSConversion, "go-ass-conversion", cfg.UseGoASSConversion, "Use native Go SRT-to-ASS conversion instead of SubtitleEdit")
 	persistentFlags.StringVar(&cfg.ShadersDir, "shaders-dir", "shaders", "Directory containing shader files")
 
 	runCmd.Flags().StringVarP(&cfg.AudioPath, "audio", "a", "", "Path to audio file (required)")

@@ -4,7 +4,6 @@ package pipeline
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/cork89/clippers/internal/config"
@@ -17,13 +16,13 @@ func Preflight(cfg *config.Config, wd *workdir.WorkDir) error {
 	fmt.Println("==> Preflight checks")
 
 	// Check ffmpeg
-	if _, err := exec.LookPath("ffmpeg"); err != nil {
+	if _, err := execLookPath("ffmpeg"); err != nil {
 		return fmt.Errorf("ffmpeg not found in PATH: %w", err)
 	}
 	fmt.Println("  ✓ ffmpeg found")
 
 	// Check ffprobe
-	if _, err := exec.LookPath("ffprobe"); err != nil {
+	if _, err := execLookPath("ffprobe"); err != nil {
 		return fmt.Errorf("ffprobe not found in PATH: %w", err)
 	}
 	fmt.Println("  ✓ ffprobe found")
@@ -35,12 +34,16 @@ func Preflight(cfg *config.Config, wd *workdir.WorkDir) error {
 	}
 	fmt.Printf("  ✓ whisper-ctranslate2 found: %s\n", whisperBin)
 
-	// Check SubtitleEdit
-	subtitleEditBin := findSubtitleEdit()
-	if subtitleEditBin == "" {
-		return fmt.Errorf("SubtitleEdit not found in PATH or common locations")
+	if cfg.UseGoASSConversion {
+		fmt.Println("  ✓ native Go ASS conversion enabled (SubtitleEdit not required)")
+	} else {
+		// Check SubtitleEdit
+		subtitleEditBin := findSubtitleEdit()
+		if subtitleEditBin == "" {
+			return fmt.Errorf("SubtitleEdit not found in PATH or common locations")
+		}
+		fmt.Printf("  ✓ SubtitleEdit found: %s\n", subtitleEditBin)
 	}
-	fmt.Printf("  ✓ SubtitleEdit found: %s\n", subtitleEditBin)
 
 	// Check LLM provider
 	if err := preflightLLM(cfg, wd); err != nil {
@@ -109,7 +112,7 @@ func preflightLLM(cfg *config.Config, wd *workdir.WorkDir) error {
 func findWhisper() string {
 	names := []string{"whisper-ctranslate2"}
 	for _, name := range names {
-		if path, err := exec.LookPath(name); err == nil {
+		if path, err := execLookPath(name); err == nil {
 			return path
 		}
 	}

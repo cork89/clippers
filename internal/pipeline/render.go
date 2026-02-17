@@ -4,7 +4,6 @@ package pipeline
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -150,7 +149,7 @@ func renderPass1WithTransitions(timeline *types.Timeline, outputPath string, asp
 	args = append(args, "-filter_complex", filter.String())
 	args = append(args, "-map", "[outv]", "-c:v", "libx264", "-pix_fmt", "yuv420p", outputPath)
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := execCommand("ffmpeg", args...)
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
@@ -210,7 +209,7 @@ func renderShaderPass(cfg *config.Config, inputPath, outputPath string, aspectCf
 		}
 	}
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := execCommand("ffmpeg", args...)
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
@@ -263,7 +262,7 @@ func renderFinalPass(wd *workdir.WorkDir, videoPath, subtitlePath, outputPath st
 		outputPath,
 	}
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := execCommand("ffmpeg", args...)
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()

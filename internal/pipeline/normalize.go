@@ -3,7 +3,6 @@ package pipeline
 
 import (
 	"fmt"
-	"os/exec"
 
 	"github.com/cork89/clippers/internal/workdir"
 )
@@ -20,7 +19,7 @@ func NormalizeAudio(wd *workdir.WorkDir, inputPath string, force bool) (string, 
 	fmt.Println("==> Normalizing audio")
 
 	// ffmpeg -y -i "input.mp3" -ac 1 -ar 16000 -c:a pcm_s16le "audio.wav"
-	cmd := exec.Command("ffmpeg",
+	cmd := execCommand("ffmpeg",
 		"-y",
 		"-i", inputPath,
 		"-ac", "1",

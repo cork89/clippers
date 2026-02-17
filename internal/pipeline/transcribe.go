@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -37,7 +36,7 @@ func Transcribe(ctx context.Context, wd *workdir.WorkDir, cfg *config.Config, db
 	audioPath := wd.Path("audio.wav")
 	outputDir := wd.Path(".")
 
-	cmd := exec.Command(whisperBin,
+	cmd := execCommand(whisperBin,
 		audioPath,
 		"--model", cfg.WhisperModel,
 		"--device", "cuda",
@@ -141,7 +140,7 @@ func parseTimestamp(h, m, s, ms string) float64 {
 }
 
 func getAudioDuration(path string) (float64, error) {
-	cmd := exec.Command("ffprobe",
+	cmd := execCommand("ffprobe",
 		"-v", "error",
 		"-show_entries", "format=duration",
 		"-of", "json",
