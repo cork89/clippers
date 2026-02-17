@@ -379,6 +379,7 @@ templ ProcessingProgressUI(projectName string) {
 }
 
 templ ProcessingCompleteUI(projectName string) {
+	<div class="card-footer" id="process-actions" hx-swap-oob="true"></div>
 	<div class="processing-complete">
 		<div class="complete-content">
 			<div class="success-icon-large">

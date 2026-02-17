@@ -165,6 +165,24 @@ var migrations = []migration{
 		name: "add_timeline_shader",
 		up:   "ALTER TABLE timeline_entries ADD COLUMN shader TEXT;",
 	},
+	{
+		name: "dedupe_project_rows_by_ordinal",
+		up: `
+DELETE FROM segments
+WHERE id NOT IN (
+	SELECT MAX(id) FROM segments GROUP BY project_id, ordinal
+);
+
+DELETE FROM text_windows
+WHERE id NOT IN (
+	SELECT MAX(id) FROM text_windows GROUP BY project_id, ordinal
+);
+
+DELETE FROM timeline_entries
+WHERE id NOT IN (
+	SELECT MAX(id) FROM timeline_entries GROUP BY project_id, ordinal
+);`,
+	},
 }
 
 func runMigrationsFromHistory(db *sql.DB) error {
@@ -219,7 +237,15 @@ func (db *DB) CreateProject(ctx context.Context, id, audioPath, imagesDir, outpu
 }
 
 func (db *DB) SaveFullTranscript(ctx context.Context, projectID string, t *types.Transcript) error {
-	if err := db.Queries.SaveTranscript(ctx, sqlc.SaveTranscriptParams{
+	tx, err := db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transcript transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	qtx := db.Queries.WithTx(tx)
+
+	if err := qtx.SaveTranscript(ctx, sqlc.SaveTranscriptParams{
 		ProjectID: projectID,
 		Language: sql.NullString{
 			String: t.Language,
@@ -230,19 +256,27 @@ func (db *DB) SaveFullTranscript(ctx context.Context, projectID string, t *types
 			Valid:   t.DurationSec > 0,
 		},
 	}); err != nil {
-		return err
+		return fmt.Errorf("failed to save transcript row: %w", err)
+	}
+
+	if err := qtx.ClearSegments(ctx, projectID); err != nil {
+		return fmt.Errorf("failed to clear existing segments: %w", err)
 	}
 
 	for i, seg := range t.Segments {
-		if err := db.Queries.SaveSegment(ctx, sqlc.SaveSegmentParams{
+		if err := qtx.SaveSegment(ctx, sqlc.SaveSegmentParams{
 			ProjectID: projectID,
 			Start:     seg.Start,
 			End:       seg.End,
 			Text:      seg.Text,
 			Ordinal:   int64(i),
 		}); err != nil {
-			return err
+			return fmt.Errorf("failed to save segment %d: %w", i, err)
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transcript transaction: %w", err)
 	}
 
 	return nil
@@ -298,9 +332,20 @@ type TextWindowData struct {
 }
 
 func (db *DB) SaveImageCatalog(ctx context.Context, projectID string, catalog *ImageCatalog) error {
+	tx, err := db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin image catalog transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	qtx := db.Queries.WithTx(tx)
+	if err := qtx.ClearImages(ctx, projectID); err != nil {
+		return fmt.Errorf("failed to clear existing images: %w", err)
+	}
+
 	for _, img := range catalog.Images {
 		tagsJSON, _ := json.Marshal(img.Tags)
-		if err := db.Queries.SaveImage(ctx, sqlc.SaveImageParams{
+		if err := qtx.SaveImage(ctx, sqlc.SaveImageParams{
 			ID:        img.ID,
 			ProjectID: projectID,
 			Path:      img.Path,
@@ -325,9 +370,14 @@ func (db *DB) SaveImageCatalog(ctx context.Context, projectID string, catalog *I
 				Valid: true,
 			},
 		}); err != nil {
-			return err
+			return fmt.Errorf("failed to save image %q: %w", img.ID, err)
 		}
 	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit image catalog transaction: %w", err)
+	}
+
 	return nil
 }
 
@@ -368,8 +418,19 @@ func (db *DB) GetImageCatalog(ctx context.Context, projectID string) (*ImageCata
 }
 
 func (db *DB) SaveTextWindows(ctx context.Context, projectID string, windows []TextWindowData) error {
+	tx, err := db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin windows transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	qtx := db.Queries.WithTx(tx)
+	if err := qtx.ClearWindows(ctx, projectID); err != nil {
+		return fmt.Errorf("failed to clear existing windows: %w", err)
+	}
+
 	for i, w := range windows {
-		if err := db.Queries.SaveWindow(ctx, sqlc.SaveWindowParams{
+		if err := qtx.SaveWindow(ctx, sqlc.SaveWindowParams{
 			ProjectID: projectID,
 			Start:     w.Start,
 			End:       w.End,
@@ -379,9 +440,14 @@ func (db *DB) SaveTextWindows(ctx context.Context, projectID string, windows []T
 			},
 			Ordinal: int64(i),
 		}); err != nil {
-			return err
+			return fmt.Errorf("failed to save window %d: %w", i, err)
 		}
 	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit windows transaction: %w", err)
+	}
+
 	return nil
 }
 
@@ -403,8 +469,19 @@ func (db *DB) GetTextWindows(ctx context.Context, projectID string) ([]TextWindo
 }
 
 func (db *DB) SaveTimeline(ctx context.Context, projectID string, timeline *types.Timeline) error {
+	tx, err := db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin timeline transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	qtx := db.Queries.WithTx(tx)
+	if err := qtx.ClearTimeline(ctx, projectID); err != nil {
+		return fmt.Errorf("failed to clear existing timeline entries: %w", err)
+	}
+
 	for i, e := range timeline.Entries {
-		if err := db.Queries.SaveTimelineEntry(ctx, sqlc.SaveTimelineEntryParams{
+		if err := qtx.SaveTimelineEntry(ctx, sqlc.SaveTimelineEntryParams{
 			ProjectID: projectID,
 			Start:     e.Start,
 			End:       e.End,
@@ -420,9 +497,14 @@ func (db *DB) SaveTimeline(ctx context.Context, projectID string, timeline *type
 			},
 			Ordinal: int64(i),
 		}); err != nil {
-			return err
+			return fmt.Errorf("failed to save timeline entry %d: %w", i, err)
 		}
 	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit timeline transaction: %w", err)
+	}
+
 	return nil
 }
 

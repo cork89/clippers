@@ -2149,7 +2149,6 @@ body {
 .success-icon-large svg {
   width: 40px;
   height: 40px;
-  animation: success-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .error-icon-large {
@@ -2184,20 +2183,6 @@ body {
   padding: 0.75rem 1rem;
   border-radius: 8px;
   max-width: 100%;
-}
-
-@keyframes success-pop {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
 }
 
 /* Loading Mini */
