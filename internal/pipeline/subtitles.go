@@ -23,9 +23,12 @@ import (
 // ------------------------------------------------------------
 
 const (
-	BoxPadding          = 3
-	CornerRadius        = 8
-	VerticalPositionPct = 0.7
+	BoxPadding                = 4
+	HorizontalPadding         = 30
+	EstimatedBoldExtraPerRune = 1.0
+	WidthSafetyScale          = 1.02
+	CornerRadius              = 8
+	VerticalPositionPct       = 0.7
 )
 
 // quantizeToFrameRate rounds time to nearest frame boundary
@@ -326,7 +329,11 @@ func addRoundedBackground(input string, subtitleAspect types.SubtitleAspect, asp
 			plain := removeTags(fields[9])
 			// boxW := fm.TextWidth(plain, aspectCfg.FontSize) + BoxPadding*2 - 20
 
-			boxW := fm.TextWidth(plain, aspectCfg.FontSize) + (BoxPadding * 12)
+			textW := fm.TextWidth(plain, aspectCfg.FontSize)
+			runeCount := len([]rune(plain))
+			boldCompensation := int(math.Ceil(float64(runeCount) * EstimatedBoldExtraPerRune))
+			boxW := textW + (HorizontalPadding * 2) + boldCompensation
+			boxW = int(math.Ceil(float64(boxW) * WidthSafetyScale))
 			boxH := aspectCfg.FontSize + BoxPadding*2
 			path := roundedRectPath(boxW, boxH, CornerRadius)
 			// fmt.Println(plain, boxW, boxH)
